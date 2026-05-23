@@ -3,6 +3,7 @@ package com.fenlight.companion.ui.trakt
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
@@ -10,13 +11,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
-import com.fenlight.companion.FenLightApp
 import com.fenlight.companion.data.model.TraktCalendarEpisode
 import com.fenlight.companion.data.model.TraktList
 import com.fenlight.companion.data.model.TraktListItem
@@ -34,11 +32,15 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
 
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            if (state.listItems.isNotEmpty()) {
-                // Show list items
+            if (state.listItems.isNotEmpty() || state.selectedListName.isNotEmpty()) {
+                // Show list items with pagination
                 ListItemsScreen(
                     listName = state.selectedListName,
                     items = state.listItems,
+                    isLoading = state.isLoading,
+                    isLoadingMore = state.listItemIsLoadingMore,
+                    hasMore = state.listItemHasMore,
+                    onLoadMore = vm::loadMoreListItems,
                     onBack = vm::clearListItems,
                     onPlayMovie = vm::playListMovie,
                 )
@@ -145,9 +147,22 @@ private fun TraktListList(
 private fun ListItemsScreen(
     listName: String,
     items: List<TraktListItem>,
+    isLoading: Boolean,
+    isLoadingMore: Boolean,
+    hasMore: Boolean,
+    onLoadMore: () -> Unit,
     onBack: () -> Unit,
     onPlayMovie: (TraktListItem) -> Unit,
 ) {
+    val listState = rememberLazyListState()
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            last >= items.size - 5 && !isLoadingMore && hasMore
+        }
+    }
+    LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) onLoadMore() }
+
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text(listName) },
@@ -155,22 +170,17 @@ private fun ListItemsScreen(
                 IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
             },
         )
-        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
+        if (isLoading && items.isEmpty()) {
+            LoadingIndicator(modifier = Modifier.padding(32.dp))
+            return@Column
+        }
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
             items(items) { item ->
                 val title = item.movie?.title ?: item.show?.title ?: "Unknown"
                 val year = (item.movie?.year ?: item.show?.year)?.toString() ?: ""
-                val posterPath = null // Trakt doesn't return images directly; we'd need a TMDB lookup
                 ListItem(
                     headlineContent = { Text(title) },
                     supportingContent = { Text(year + if (item.type.isNotBlank()) " · ${item.type}" else "") },
-                    leadingContent = {
-                        AsyncImage(
-                            model = FenLightApp.posterUrl(posterPath),
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            contentScale = ContentScale.Crop,
-                        )
-                    },
                     trailingContent = {
                         if (item.type == "movie" && item.movie?.ids?.tmdb != null) {
                             IconButton(onClick = { onPlayMovie(item) }) {
@@ -180,6 +190,11 @@ private fun ListItemsScreen(
                     },
                 )
                 HorizontalDivider()
+            }
+            if (isLoadingMore) {
+                item {
+                    LoadingIndicator(modifier = Modifier.padding(16.dp))
+                }
             }
         }
     }

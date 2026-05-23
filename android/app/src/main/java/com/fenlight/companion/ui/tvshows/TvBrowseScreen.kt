@@ -10,13 +10,27 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fenlight.companion.ui.components.*
+import com.fenlight.companion.ui.lists.ListManagementViewModel
 
 @Composable
 fun TvBrowseScreen(
     onShowClick: (Int) -> Unit,
     vm: TvViewModel = viewModel(),
+    listVm: ListManagementViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    var selectedItem by remember { mutableStateOf<PaginatedItem?>(null) }
+
+    selectedItem?.let { item ->
+        ListManagementSheet(
+            mediaId = item.id,
+            mediaType = "show",
+            title = item.title,
+            posterUrl = item.posterUrl,
+            onDismiss = { selectedItem = null },
+            vm = listVm,
+        )
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         ScrollableTabRow(selectedTabIndex = state.tab.ordinal, edgePadding = 0.dp) {
@@ -47,6 +61,7 @@ fun TvBrowseScreen(
                         hasMore = state.hasMore,
                         onLoadMore = vm::loadNextPage,
                         onItemClick = { onShowClick(it.id) },
+                        onItemLongClick = { selectedItem = it },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -84,6 +99,7 @@ fun TvBrowseScreen(
                         hasMore = state.hasMore,
                         onLoadMore = vm::loadNextPage,
                         onItemClick = { onShowClick(it.id) },
+                        onItemLongClick = { selectedItem = it },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -94,6 +110,7 @@ fun TvBrowseScreen(
                 hasMore = state.hasMore,
                 onLoadMore = vm::loadNextPage,
                 onItemClick = { onShowClick(it.id) },
+                onItemLongClick = { selectedItem = it },
                 modifier = Modifier.fillMaxSize(),
             )
         }

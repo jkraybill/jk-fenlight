@@ -11,17 +11,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.fenlight.companion.FenLightApp
 import com.fenlight.companion.ui.components.*
+import com.fenlight.companion.ui.lists.ListManagementViewModel
 
 @Composable
 fun MovieBrowseScreen(
     onMovieClick: (Int) -> Unit,
     vm: MovieViewModel = viewModel(),
+    listVm: ListManagementViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    var selectedItem by remember { mutableStateOf<PaginatedItem?>(null) }
+
+    selectedItem?.let { item ->
+        ListManagementSheet(
+            mediaId = item.id,
+            mediaType = "movie",
+            title = item.title,
+            posterUrl = item.posterUrl,
+            onDismiss = { selectedItem = null },
+            vm = listVm,
+        )
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Tab row
         ScrollableTabRow(selectedTabIndex = state.tab.ordinal, edgePadding = 0.dp) {
             listOf("Popular", "Trending", "Now Playing", "Upcoming", "Search", "Discover", "My Lists")
                 .forEachIndexed { i, label ->
@@ -34,8 +48,8 @@ fun MovieBrowseScreen(
         }
 
         when (state.tab) {
-            MovieBrowseTab.SEARCH -> SearchTab(state, vm, onMovieClick)
-            MovieBrowseTab.DISCOVER -> DiscoverTab(state, vm, onMovieClick)
+            MovieBrowseTab.SEARCH -> SearchTab(state, vm, onMovieClick, onItemLongClick = { selectedItem = it })
+            MovieBrowseTab.DISCOVER -> DiscoverTab(state, vm, onMovieClick, onItemLongClick = { selectedItem = it })
             MovieBrowseTab.LISTS -> ListsTab(state, vm, onMovieClick)
             else -> PaginatedGrid(
                 items = state.items,
@@ -43,6 +57,7 @@ fun MovieBrowseScreen(
                 hasMore = state.hasMore,
                 onLoadMore = vm::loadNextPage,
                 onItemClick = { onMovieClick(it.id) },
+                onItemLongClick = { selectedItem = it },
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -54,7 +69,12 @@ fun MovieBrowseScreen(
 }
 
 @Composable
-private fun SearchTab(state: MovieUiState, vm: MovieViewModel, onMovieClick: (Int) -> Unit) {
+private fun SearchTab(
+    state: MovieUiState,
+    vm: MovieViewModel,
+    onMovieClick: (Int) -> Unit,
+    onItemLongClick: (PaginatedItem) -> Unit,
+) {
     Column(modifier = Modifier.fillMaxSize()) {
         OutlinedTextField(
             value = state.searchQuery,
@@ -70,13 +90,19 @@ private fun SearchTab(state: MovieUiState, vm: MovieViewModel, onMovieClick: (In
             hasMore = state.hasMore,
             onLoadMore = vm::loadNextPage,
             onItemClick = { onMovieClick(it.id) },
+            onItemLongClick = onItemLongClick,
             modifier = Modifier.fillMaxSize(),
         )
     }
 }
 
 @Composable
-private fun DiscoverTab(state: MovieUiState, vm: MovieViewModel, onMovieClick: (Int) -> Unit) {
+private fun DiscoverTab(
+    state: MovieUiState,
+    vm: MovieViewModel,
+    onMovieClick: (Int) -> Unit,
+    onItemLongClick: (PaginatedItem) -> Unit,
+) {
     val sortOptions = listOf(
         "popularity.desc" to "Most Popular",
         "vote_average.desc" to "Highest Rated",
@@ -121,6 +147,7 @@ private fun DiscoverTab(state: MovieUiState, vm: MovieViewModel, onMovieClick: (
             hasMore = state.hasMore,
             onLoadMore = vm::loadNextPage,
             onItemClick = { onMovieClick(it.id) },
+            onItemLongClick = onItemLongClick,
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -129,12 +156,11 @@ private fun DiscoverTab(state: MovieUiState, vm: MovieViewModel, onMovieClick: (
 @Composable
 private fun ListsTab(state: MovieUiState, vm: MovieViewModel, onMovieClick: (Int) -> Unit) {
     if (state.listItems.isNotEmpty()) {
-        // Showing items of a specific list
         val gridItems = state.listItems.map { item ->
             PaginatedItem(
                 id = item.id,
                 title = item.title ?: item.name ?: "Unknown",
-                posterUrl = com.fenlight.companion.FenLightApp.posterUrl(item.posterPath),
+                posterUrl = FenLightApp.posterUrl(item.posterPath),
                 rating = null,
             )
         }

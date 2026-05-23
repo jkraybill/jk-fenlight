@@ -14,12 +14,20 @@ import kotlinx.coroutines.launch
 
 enum class RdTab { TORRENTS, DOWNLOADS }
 
+private const val PAGE_SIZE = 50
+
 data class RdUiState(
     val tab: RdTab = RdTab.TORRENTS,
     val isLoading: Boolean = false,
     val error: String? = null,
     val torrents: List<RdTorrent> = emptyList(),
+    val torrentPage: Int = 0,
+    val torrentHasMore: Boolean = true,
+    val torrentIsLoadingMore: Boolean = false,
     val downloads: List<RdDownload> = emptyList(),
+    val downloadPage: Int = 0,
+    val downloadHasMore: Boolean = true,
+    val downloadIsLoadingMore: Boolean = false,
     val selectedTorrent: RdTorrentInfo? = null,
     val playMessage: String? = null,
 )
@@ -37,31 +45,69 @@ class RdViewModel(application: Application) : AndroidViewModel(application) {
     fun selectTab(tab: RdTab) {
         _state.update { it.copy(tab = tab) }
         when (tab) {
-            RdTab.TORRENTS -> loadTorrents()
-            RdTab.DOWNLOADS -> loadDownloads()
+            RdTab.TORRENTS -> if (_state.value.torrents.isEmpty()) loadTorrents() else Unit
+            RdTab.DOWNLOADS -> if (_state.value.downloads.isEmpty()) loadDownloads()
         }
     }
 
     fun loadTorrents() {
+        _state.update { it.copy(isLoading = true, error = null, torrents = emptyList(), torrentPage = 0, torrentHasMore = true) }
+        fetchTorrentPage(page = 1, append = false)
+    }
+
+    fun loadMoreTorrents() {
+        val s = _state.value
+        if (s.torrentIsLoadingMore || !s.torrentHasMore) return
+        fetchTorrentPage(page = s.torrentPage + 1, append = true)
+    }
+
+    private fun fetchTorrentPage(page: Int, append: Boolean) {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
+            _state.update { it.copy(torrentIsLoadingMore = append, isLoading = !append) }
             try {
-                val torrents = rdApi().torrents()
-                _state.update { it.copy(isLoading = false, torrents = torrents) }
+                val results = rdApi().torrents(limit = PAGE_SIZE, page = page)
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        torrentIsLoadingMore = false,
+                        torrents = if (append) it.torrents + results else results,
+                        torrentPage = page,
+                        torrentHasMore = results.size == PAGE_SIZE,
+                    )
+                }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message) }
+                _state.update { it.copy(isLoading = false, torrentIsLoadingMore = false, error = e.message) }
             }
         }
     }
 
-    private fun loadDownloads() {
+    fun loadDownloads() {
+        _state.update { it.copy(isLoading = true, error = null, downloads = emptyList(), downloadPage = 0, downloadHasMore = true) }
+        fetchDownloadPage(page = 1, append = false)
+    }
+
+    fun loadMoreDownloads() {
+        val s = _state.value
+        if (s.downloadIsLoadingMore || !s.downloadHasMore) return
+        fetchDownloadPage(page = s.downloadPage + 1, append = true)
+    }
+
+    private fun fetchDownloadPage(page: Int, append: Boolean) {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
+            _state.update { it.copy(downloadIsLoadingMore = append, isLoading = !append) }
             try {
-                val downloads = rdApi().downloads()
-                _state.update { it.copy(isLoading = false, downloads = downloads) }
+                val results = rdApi().downloads(limit = PAGE_SIZE, page = page)
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        downloadIsLoadingMore = false,
+                        downloads = if (append) it.downloads + results else results,
+                        downloadPage = page,
+                        downloadHasMore = results.size == PAGE_SIZE,
+                    )
+                }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message) }
+                _state.update { it.copy(isLoading = false, downloadIsLoadingMore = false, error = e.message) }
             }
         }
     }
@@ -84,7 +130,6 @@ class RdViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
             try {
-                // The file index in links matches selected files order
                 val selectedFiles = torrent.files.filter { it.selected == 1 }
                 val fileIndex = selectedFiles.indexOfFirst { it.id == file.id }
                 if (fileIndex < 0 || fileIndex >= torrent.links.size) {

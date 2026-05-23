@@ -1,6 +1,7 @@
 package com.fenlight.companion.data.api
 
 import com.fenlight.companion.data.model.*
+import retrofit2.Response
 import retrofit2.http.*
 
 interface TraktApi {
@@ -27,15 +28,42 @@ interface TraktApi {
     suspend fun myListItems(
         @Path("slug") slug: String,
         @Query("extended") extended: String = "full",
-    ): List<TraktListItem>
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 50,
+    ): Response<List<TraktListItem>>
 
     @GET("users/likes/lists")
-    suspend fun likedLists(@Query("page") page: Int = 1): List<TraktLikedList>
+    suspend fun likedLists(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 50,
+    ): Response<List<TraktLikedList>>
 
     @GET("users/{user}/lists/{slug}/items")
     suspend fun listItems(
         @Path("user") user: String,
         @Path("slug") slug: String,
         @Query("extended") extended: String = "full",
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 50,
+    ): Response<List<TraktListItem>>
+
+    // Watchlist
+    @GET("sync/watchlist/{type}")
+    suspend fun getWatchlist(
+        @Path("type") type: String,
+        @Query("extended") extended: String = "full",
     ): List<TraktListItem>
+
+    @POST("sync/watchlist")
+    suspend fun addToWatchlist(@Body body: Map<String, Any>): Any
+
+    @POST("sync/watchlist/remove")
+    suspend fun removeFromWatchlist(@Body body: Map<String, Any>): Any
+
+    // Add items to a user's custom list
+    @POST("users/me/lists/{slug}/items")
+    suspend fun addToListItems(
+        @Path("slug") slug: String,
+        @Body body: Map<String, Any>,
+    ): Any
 }

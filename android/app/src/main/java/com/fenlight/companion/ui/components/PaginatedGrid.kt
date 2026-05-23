@@ -21,6 +21,7 @@ fun PaginatedGrid(
     hasMore: Boolean,
     onLoadMore: () -> Unit,
     onItemClick: (PaginatedItem) -> Unit,
+    onItemLongClick: ((PaginatedItem) -> Unit)? = null,
     modifier: Modifier = Modifier,
     columns: Int = 3,
 ) {
@@ -51,6 +52,7 @@ fun PaginatedGrid(
                 posterUrl = item.posterUrl,
                 rating = item.rating,
                 onClick = { onItemClick(item) },
+                onLongClick = onItemLongClick?.let { { it(item) } },
             )
         }
         if (isLoading) {

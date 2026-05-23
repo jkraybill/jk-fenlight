@@ -105,4 +105,16 @@ interface TmdbV4Api {
         @Path("list_id") listId: Int,
         @Query("page") page: Int = 1,
     ): TmdbListDetail
+
+    @POST("list/{list_id}/items")
+    suspend fun addItemToList(
+        @Path("list_id") listId: Int,
+        @Body body: Map<String, Any>,
+    ): Any
+
+    @HTTP(method = "DELETE", path = "list/{list_id}/items", hasBody = true)
+    suspend fun removeItemFromList(
+        @Path("list_id") listId: Int,
+        @Body body: Map<String, Any>,
+    ): Any
 }

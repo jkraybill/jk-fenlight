@@ -3,6 +3,7 @@ package com.fenlight.companion.ui.realdebrid
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
@@ -51,22 +52,49 @@ fun RdScreen(vm: RdViewModel = viewModel()) {
             state.error?.let { ErrorMessage(it, onRetry = { vm.selectTab(state.tab) }, modifier = Modifier.padding(16.dp)); return@Column }
 
             when (state.tab) {
-                RdTab.TORRENTS -> TorrentList(state.torrents, onTorrentClick = { vm.loadTorrentInfo(it.id) })
-                RdTab.DOWNLOADS -> DownloadList(state.downloads, onPlay = { vm.playDownload(it) })
+                RdTab.TORRENTS -> TorrentList(
+                    torrents = state.torrents,
+                    isLoadingMore = state.torrentIsLoadingMore,
+                    hasMore = state.torrentHasMore,
+                    onLoadMore = vm::loadMoreTorrents,
+                    onTorrentClick = { vm.loadTorrentInfo(it.id) },
+                )
+                RdTab.DOWNLOADS -> DownloadList(
+                    downloads = state.downloads,
+                    isLoadingMore = state.downloadIsLoadingMore,
+                    hasMore = state.downloadHasMore,
+                    onLoadMore = vm::loadMoreDownloads,
+                    onPlay = { vm.playDownload(it) },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun TorrentList(torrents: List<RdTorrent>, onTorrentClick: (RdTorrent) -> Unit) {
+private fun TorrentList(
+    torrents: List<RdTorrent>,
+    isLoadingMore: Boolean,
+    hasMore: Boolean,
+    onLoadMore: () -> Unit,
+    onTorrentClick: (RdTorrent) -> Unit,
+) {
+    val listState = rememberLazyListState()
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            last >= torrents.size - 5 && !isLoadingMore && hasMore
+        }
+    }
+    LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) onLoadMore() }
+
     if (torrents.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("No torrents in your Real Debrid cloud", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         return
     }
-    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
+    LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
         items(torrents) { torrent ->
             Card(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -80,6 +108,9 @@ private fun TorrentList(torrents: List<RdTorrent>, onTorrentClick: (RdTorrent) -
                     }
                 }
             }
+        }
+        if (isLoadingMore) {
+            item { LoadingIndicator(modifier = Modifier.padding(16.dp)) }
         }
     }
 }
@@ -141,15 +172,27 @@ private fun TorrentFileList(
 @Composable
 private fun DownloadList(
     downloads: List<com.fenlight.companion.data.model.RdDownload>,
+    isLoadingMore: Boolean,
+    hasMore: Boolean,
+    onLoadMore: () -> Unit,
     onPlay: (com.fenlight.companion.data.model.RdDownload) -> Unit,
 ) {
+    val listState = rememberLazyListState()
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            last >= downloads.size - 5 && !isLoadingMore && hasMore
+        }
+    }
+    LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) onLoadMore() }
+
     if (downloads.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("No downloads found", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         return
     }
-    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
+    LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
         items(downloads) { dl ->
             ListItem(
                 headlineContent = { Text(dl.filename, maxLines = 2) },
@@ -161,6 +204,9 @@ private fun DownloadList(
                 },
             )
             HorizontalDivider()
+        }
+        if (isLoadingMore) {
+            item { LoadingIndicator(modifier = Modifier.padding(16.dp)) }
         }
     }
 }
