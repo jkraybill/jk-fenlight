@@ -21,7 +21,11 @@ import com.fenlight.companion.ui.components.PaginatedItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TmdbListsScreen(vm: TmdbListsViewModel = viewModel()) {
+fun TmdbListsScreen(
+    onMovieClick: (Int) -> Unit = {},
+    onShowClick: (Int) -> Unit = {},
+    vm: TmdbListsViewModel = viewModel(),
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -51,6 +55,9 @@ fun TmdbListsScreen(vm: TmdbListsViewModel = viewModel()) {
                     navigationIcon = { IconButton(onClick = vm::clearListItems) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") } },
                 )
                 if (state.isLoading) { LoadingIndicator(modifier = Modifier.padding(32.dp)); return@Column }
+                val mediaTypeById = remember(state.listItems) {
+                    state.listItems.associate { it.id to it.mediaType }
+                }
                 val gridItems = state.listItems.map { item ->
                     PaginatedItem(
                         id = item.id,
@@ -64,7 +71,12 @@ fun TmdbListsScreen(vm: TmdbListsViewModel = viewModel()) {
                     isLoading = state.listItemIsLoadingMore,
                     hasMore = state.listItemHasMore,
                     onLoadMore = vm::loadMoreListItems,
-                    onItemClick = {},
+                    onItemClick = { item ->
+                        when (mediaTypeById[item.id]) {
+                            "tv" -> onShowClick(item.id)
+                            else -> onMovieClick(item.id)
+                        }
+                    },
                     modifier = Modifier.fillMaxSize(),
                 )
                 return@Column

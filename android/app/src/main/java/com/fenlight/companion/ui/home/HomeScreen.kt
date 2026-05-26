@@ -97,7 +97,12 @@ fun HomeScreen(
                 val id = back.arguments?.getString("id")?.toIntOrNull() ?: return@composable
                 TvDetailScreen(tmdbId = id, onBack = { navController.popBackStack() })
             }
-            composable("tmdb_lists") { TmdbListsScreen() }
+            composable("tmdb_lists") {
+                TmdbListsScreen(
+                    onMovieClick = { id -> navController.navigate("movie_detail/$id") },
+                    onShowClick = { id -> navController.navigate("tv_detail/$id") },
+                )
+            }
             composable("trakt") { TraktScreen() }
             composable("rd") { RdScreen() }
         }
