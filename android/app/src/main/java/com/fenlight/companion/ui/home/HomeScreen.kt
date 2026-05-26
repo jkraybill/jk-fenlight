@@ -45,7 +45,7 @@ fun HomeScreen(
         topBar = {
             @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
-                title = { Text("FenLight Companion") },
+                title = { Text("FenLight+ Companion") },
                 actions = {
                     IconButton(onClick = onGoToSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")

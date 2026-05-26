@@ -7,7 +7,7 @@
 
     <application
         android:name=".FenLightApp"
-        android:label="FenLight Companion"
+        android:label="FenLight+ Companion"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.FenLightCompanion"

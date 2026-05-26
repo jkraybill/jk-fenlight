@@ -80,7 +80,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val destFile = File(context.getExternalFilesDir(null), "FenLightCompanion-update.apk")
         val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val request = DownloadManager.Request(Uri.parse(apkUrl))
-            .setTitle("FenLight Companion update")
+            .setTitle("FenLight+ Companion update")
             .setDescription("Downloading…")
             .setMimeType("application/vnd.android.package-archive")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)

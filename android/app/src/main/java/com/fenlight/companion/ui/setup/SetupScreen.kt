@@ -59,7 +59,7 @@ fun SetupScreen(
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         Text(
-            text = "FenLight Companion",
+            text = "FenLight+ Companion",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
         )
