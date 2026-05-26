@@ -27,8 +27,8 @@ fun PaginatedGrid(
 ) {
     val listState = rememberLazyGridState()
 
-    // Trigger load more when nearing the end
-    val shouldLoadMore by remember {
+    // Trigger load more when nearing the end of visible items
+    val shouldLoadMore by remember(isLoading, hasMore) {
         derivedStateOf {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
             lastVisible >= items.size - 6 && !isLoading && hasMore
@@ -36,6 +36,13 @@ fun PaginatedGrid(
     }
     LaunchedEffect(shouldLoadMore) {
         if (shouldLoadMore) onLoadMore()
+    }
+    // Also trigger after each page loads — in case the grid isn't full enough to scroll
+    LaunchedEffect(items.size, isLoading) {
+        if (!isLoading && hasMore) {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            if (lastVisible >= items.size - 6) onLoadMore()
+        }
     }
 
     LazyVerticalGrid(

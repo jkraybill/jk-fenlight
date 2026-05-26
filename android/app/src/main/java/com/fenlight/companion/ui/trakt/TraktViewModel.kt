@@ -5,21 +5,19 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.fenlight.companion.FenLightApp
 import com.fenlight.companion.data.api.KodiRpc
-import com.fenlight.companion.data.model.TraktCalendarEpisode
 import com.fenlight.companion.data.model.TraktList
 import com.fenlight.companion.data.model.TraktListItem
+import com.fenlight.companion.data.model.TraktWatchedShow
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
 
-enum class TraktTab { NEXT_EPISODES, MY_LISTS, LIKED_LISTS }
+enum class TraktTab { CONTINUE_WATCHING, MY_LISTS, LIKED_LISTS }
 
 data class TraktUiState(
-    val tab: TraktTab = TraktTab.NEXT_EPISODES,
+    val tab: TraktTab = TraktTab.CONTINUE_WATCHING,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val calendarEpisodes: List<TraktCalendarEpisode> = emptyList(),
+    val watchedShows: List<TraktWatchedShow> = emptyList(),
     val myLists: List<TraktList> = emptyList(),
     val likedLists: List<TraktList> = emptyList(),
     val listItems: List<TraktListItem> = emptyList(),
@@ -47,23 +45,21 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun loadCurrentTab() {
         when (_state.value.tab) {
-            TraktTab.NEXT_EPISODES -> loadCalendar()
+            TraktTab.CONTINUE_WATCHING -> loadContinueWatching()
             TraktTab.MY_LISTS -> loadMyLists()
             TraktTab.LIKED_LISTS -> loadLikedLists()
         }
     }
 
-    private fun loadCalendar() {
+    private fun loadContinueWatching() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
                 val token = app.prefs.traktAccessToken.first()
                 val api = app.buildAuthedTraktApi(token)
-                val start = SimpleDateFormat("yyyy-MM-dd", Locale.US).let {
-                    it.format(Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -7) }.time)
-                }
-                val episodes = api.myCalendar(start, 21)
-                _state.update { it.copy(isLoading = false, calendarEpisodes = episodes.sortedBy { ep -> ep.firstAired }) }
+                val shows = api.watchedShows()
+                val sorted = shows.sortedByDescending { it.lastWatchedAt }
+                _state.update { it.copy(isLoading = false, watchedShows = sorted) }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, error = e.message) }
             }
@@ -153,13 +149,12 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
         it.copy(listItems = emptyList(), selectedListName = "", selectedListSlug = "", listItemPage = 0, listItemHasMore = false)
     }
 
-    fun playEpisode(cal: TraktCalendarEpisode) {
+    fun playNextEpisode(watched: TraktWatchedShow) {
         viewModelScope.launch {
-            val tmdbId = cal.show.ids.tmdb ?: return@launch
-            val title = cal.show.title
-            val year = cal.show.year ?: 0
-            val season = cal.episode.season
-            val ep = cal.episode.number
+            val tmdbId = watched.show.ids.tmdb ?: return@launch
+            val title = watched.show.title
+            val year = watched.show.year ?: 0
+            val (season, ep) = watched.nextEpisode() ?: return@launch
             try {
                 val host = app.prefs.kodiHost.first()
                 val port = app.prefs.kodiPort.first()

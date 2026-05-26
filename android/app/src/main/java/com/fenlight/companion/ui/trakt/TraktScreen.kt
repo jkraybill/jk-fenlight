@@ -15,9 +15,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.fenlight.companion.data.model.TraktCalendarEpisode
 import com.fenlight.companion.data.model.TraktList
 import com.fenlight.companion.data.model.TraktListItem
+import com.fenlight.companion.data.model.TraktWatchedShow
 import com.fenlight.companion.ui.components.ErrorMessage
 import com.fenlight.companion.ui.components.LoadingIndicator
 
@@ -48,7 +48,7 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
             }
 
             TabRow(selectedTabIndex = state.tab.ordinal) {
-                listOf("Next Episodes", "My Lists", "Liked Lists").forEachIndexed { i, label ->
+                listOf("Continue Watching", "My Lists", "Liked Lists").forEachIndexed { i, label ->
                     Tab(
                         selected = state.tab.ordinal == i,
                         onClick = { vm.selectTab(TraktTab.values()[i]) },
@@ -68,7 +68,7 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
             }
 
             when (state.tab) {
-                TraktTab.NEXT_EPISODES -> CalendarList(state.calendarEpisodes, vm::playEpisode)
+                TraktTab.CONTINUE_WATCHING -> ContinueWatchingList(state.watchedShows, vm::playNextEpisode)
                 TraktTab.MY_LISTS -> TraktListList(state.myLists) { list ->
                     vm.loadListItems(list.slug, list.name, "me")
                 }
@@ -82,29 +82,33 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
 }
 
 @Composable
-private fun CalendarList(
-    episodes: List<TraktCalendarEpisode>,
-    onPlay: (TraktCalendarEpisode) -> Unit,
+private fun ContinueWatchingList(
+    shows: List<TraktWatchedShow>,
+    onPlay: (TraktWatchedShow) -> Unit,
 ) {
-    if (episodes.isEmpty()) {
+    if (shows.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No upcoming episodes", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("No recently watched shows", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         return
     }
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
-        items(episodes) { cal ->
-            val ep = cal.episode
-            val show = cal.show
+        items(shows) { watched ->
+            val next = watched.nextEpisode()
             ListItem(
-                headlineContent = { Text(show.title, fontWeight = FontWeight.SemiBold) },
+                headlineContent = { Text(watched.show.title, fontWeight = FontWeight.SemiBold) },
                 supportingContent = {
-                    Text("S${ep.season}E${ep.number} · ${ep.title}")
-                    cal.firstAired.take(10).let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    if (next != null) {
+                        Text("Next: S${next.first}E${next.second}", style = MaterialTheme.typography.bodySmall)
+                    } else {
+                        Text("Watched ${watched.plays} episode${if (watched.plays != 1) "s" else ""}", style = MaterialTheme.typography.bodySmall)
+                    }
                 },
                 trailingContent = {
-                    IconButton(onClick = { onPlay(cal) }) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = MaterialTheme.colorScheme.primary)
+                    if (next != null) {
+                        IconButton(onClick = { onPlay(watched) }) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = "Play next", tint = MaterialTheme.colorScheme.primary)
+                        }
                     }
                 },
             )

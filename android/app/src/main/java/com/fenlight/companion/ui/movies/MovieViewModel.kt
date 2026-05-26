@@ -5,19 +5,20 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.fenlight.companion.FenLightApp
 import com.fenlight.companion.data.api.KodiRpc
+import com.fenlight.companion.data.model.Genre
 import com.fenlight.companion.data.model.Movie
-import com.fenlight.companion.data.model.TmdbList
-import com.fenlight.companion.data.model.TmdbListItem
 import com.fenlight.companion.ui.components.PaginatedItem
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-enum class MovieBrowseTab { POPULAR, TRENDING, NOW_PLAYING, UPCOMING, SEARCH, DISCOVER, LISTS }
+enum class MovieBrowseTab { POPULAR, TRENDING, NOW_PLAYING, UPCOMING, SEARCH, DISCOVER }
 
 data class DiscoverFilters(
     val genreId: String = "",
     val year: String = "",
     val sortBy: String = "popularity.desc",
+    val minRating: String = "",
+    val language: String = "",
 )
 
 data class MovieUiState(
@@ -29,10 +30,9 @@ data class MovieUiState(
     val error: String? = null,
     val searchQuery: String = "",
     val discoverFilters: DiscoverFilters = DiscoverFilters(),
+    val discoverShowForm: Boolean = true,
+    val movieGenres: List<Genre> = emptyList(),
     val selectedMovie: Movie? = null,
-    val myLists: List<TmdbList> = emptyList(),
-    val listItems: List<TmdbListItem> = emptyList(),
-    val selectedListName: String = "",
     val playMessage: String? = null,
 )
 
@@ -42,12 +42,19 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
     private val _state = MutableStateFlow(MovieUiState())
     val state: StateFlow<MovieUiState> = _state.asStateFlow()
 
-    init { loadNextPage() }
+    init {
+        loadNextPage()
+        loadMovieGenres()
+    }
 
     fun selectTab(tab: MovieBrowseTab) {
         if (_state.value.tab == tab) return
-        _state.update { MovieUiState(tab = tab) }
-        if (tab == MovieBrowseTab.LISTS) loadMyLists() else loadNextPage()
+        if (tab == MovieBrowseTab.DISCOVER) {
+            _state.update { MovieUiState(tab = tab, discoverShowForm = true, movieGenres = it.movieGenres) }
+        } else {
+            _state.update { MovieUiState(tab = tab, movieGenres = it.movieGenres) }
+            loadNextPage()
+        }
     }
 
     fun onSearchQueryChange(q: String) {
@@ -56,8 +63,16 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun onDiscoverFilterChange(filters: DiscoverFilters) {
-        _state.update { it.copy(discoverFilters = filters, items = emptyList(), page = 0, hasMore = true) }
+        _state.update { it.copy(discoverFilters = filters) }
+    }
+
+    fun runDiscover() {
+        _state.update { it.copy(items = emptyList(), page = 0, hasMore = true, discoverShowForm = false) }
         loadNextPage()
+    }
+
+    fun showDiscoverForm() {
+        _state.update { it.copy(discoverShowForm = true, items = emptyList(), page = 0, hasMore = true) }
     }
 
     fun loadNextPage() {
@@ -67,11 +82,12 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             try {
+                val region = app.prefs.region.first().takeIf { it.isNotBlank() }
                 val result = when (s.tab) {
-                    MovieBrowseTab.POPULAR -> app.tmdbApi.popularMovies(nextPage)
-                    MovieBrowseTab.TRENDING -> app.tmdbApi.trendingMovies(nextPage)
-                    MovieBrowseTab.NOW_PLAYING -> app.tmdbApi.nowPlayingMovies(nextPage)
-                    MovieBrowseTab.UPCOMING -> app.tmdbApi.upcomingMovies(nextPage)
+                    MovieBrowseTab.POPULAR -> app.tmdbApi.popularMovies(nextPage, region = region)
+                    MovieBrowseTab.TRENDING -> app.tmdbApi.trendingMovies(nextPage, region = region)
+                    MovieBrowseTab.NOW_PLAYING -> app.tmdbApi.nowPlayingMovies(nextPage, region = region)
+                    MovieBrowseTab.UPCOMING -> app.tmdbApi.upcomingMovies(nextPage, region = region)
                     MovieBrowseTab.SEARCH -> app.tmdbApi.searchMovies(s.searchQuery, nextPage)
                     MovieBrowseTab.DISCOVER -> {
                         val f = s.discoverFilters
@@ -79,10 +95,14 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
                             if (f.genreId.isNotBlank()) put("with_genres", f.genreId)
                             if (f.year.isNotBlank()) put("primary_release_year", f.year)
                             put("sort_by", f.sortBy)
+                            if (f.minRating.isNotBlank()) {
+                                put("vote_average.gte", f.minRating)
+                                put("vote_count.gte", "20")
+                            }
+                            if (f.language.isNotBlank()) put("with_original_language", f.language)
                         }
-                        app.tmdbApi.discoverMovies(filters, nextPage)
+                        app.tmdbApi.discoverMovies(filters, nextPage, region = region)
                     }
-                    MovieBrowseTab.LISTS -> return@launch
                 }
                 val newItems = result.results.map { m ->
                     PaginatedItem(
@@ -106,6 +126,15 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun loadMovieGenres() {
+        viewModelScope.launch {
+            try {
+                val genres = app.tmdbApi.movieGenres()
+                _state.update { it.copy(movieGenres = genres.genres) }
+            } catch (_: Exception) {}
+        }
+    }
+
     fun loadMovieDetail(tmdbId: Int) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
@@ -119,35 +148,6 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearSelectedMovie() = _state.update { it.copy(selectedMovie = null) }
-
-    fun loadMyLists() {
-        viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
-            try {
-                val accessToken = app.prefs.tmdbAccessToken.first()
-                val accountId = app.prefs.tmdbAccountId.first()
-                val v4 = app.buildTmdbV4Api(accessToken)
-                val lists = v4.accountLists(accountId)
-                _state.update { it.copy(isLoading = false, myLists = lists.results, listItems = emptyList()) }
-            } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message) }
-            }
-        }
-    }
-
-    fun loadListItems(listId: Int, listName: String) {
-        viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null, selectedListName = listName) }
-            try {
-                val accessToken = app.prefs.tmdbAccessToken.first()
-                val v4 = app.buildTmdbV4Api(accessToken)
-                val detail = v4.listDetail(listId)
-                _state.update { it.copy(isLoading = false, listItems = detail.results) }
-            } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message) }
-            }
-        }
-    }
 
     fun playMovie(movie: Movie) {
         viewModelScope.launch {

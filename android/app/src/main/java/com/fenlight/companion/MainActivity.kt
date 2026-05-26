@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
                 val kodiHost by prefs.kodiHost.collectAsStateWithLifecycle(initialValue = "")
                 val traktToken by prefs.traktAccessToken.collectAsStateWithLifecycle(initialValue = "")
                 val rdToken by prefs.rdAccessToken.collectAsStateWithLifecycle(initialValue = "")
+                val tmdbToken by prefs.tmdbAccessToken.collectAsStateWithLifecycle(initialValue = "")
 
                 val isSetupDone = kodiHost.isNotBlank()
                 var screen by remember { mutableStateOf(if (isSetupDone) AppScreen.Home else AppScreen.Setup) }
@@ -59,6 +60,7 @@ class MainActivity : ComponentActivity() {
                         onOpenSetup = { screen = AppScreen.Setup },
                     )
                     AppScreen.Home -> HomeScreen(
+                        hasTmdbAuth = tmdbToken.isNotBlank(),
                         hasTraktAuth = traktToken.isNotBlank(),
                         hasRdAuth = rdToken.isNotBlank(),
                         onGoToSettings = { screen = AppScreen.Settings },

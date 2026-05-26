@@ -1,6 +1,7 @@
 package com.fenlight.companion.data.api
 
 import com.fenlight.companion.data.model.*
+import com.fenlight.companion.data.model.TraktWatchedShow
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -66,4 +67,7 @@ interface TraktApi {
         @Path("slug") slug: String,
         @Body body: Map<String, Any>,
     ): Any
+
+    @GET("sync/watched/shows")
+    suspend fun watchedShows(): List<TraktWatchedShow>
 }

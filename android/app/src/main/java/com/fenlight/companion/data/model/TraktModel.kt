@@ -22,49 +22,58 @@ data class TraktToken(
 )
 
 @JsonClass(generateAdapter = true)
+data class TraktListIds(
+    val trakt: Int?,
+    val slug: String,
+)
+
+@JsonClass(generateAdapter = true)
 data class TraktList(
     val name: String,
-    val description: String,
-    val slug: String,
-    val user: TraktUser?,
-    @Json(name = "item_count") val itemCount: Int,
-    @Json(name = "likes") val likes: Int,
-)
+    val description: String = "",
+    val ids: TraktListIds,
+    val user: TraktUser? = null,
+    @Json(name = "item_count") val itemCount: Int = 0,
+    val likes: Int = 0,
+) {
+    // Convenience accessor — Moshi only deserialises constructor params
+    val slug: String get() = ids.slug
+}
 
 @JsonClass(generateAdapter = true)
 data class TraktUser(
     val username: String,
-    val name: String?,
+    val name: String? = null,
 )
 
 @JsonClass(generateAdapter = true)
 data class TraktListItem(
     val type: String,
-    val movie: TraktMovie?,
-    val show: TraktShow?,
+    val movie: TraktMovie? = null,
+    val show: TraktShow? = null,
 )
 
 @JsonClass(generateAdapter = true)
 data class TraktMovie(
     val title: String,
-    val year: Int?,
+    val year: Int? = null,
     val ids: TraktIds,
 )
 
 @JsonClass(generateAdapter = true)
 data class TraktShow(
     val title: String,
-    val year: Int?,
+    val year: Int? = null,
     val ids: TraktIds,
 )
 
 @JsonClass(generateAdapter = true)
 data class TraktIds(
-    val trakt: Int?,
-    val slug: String?,
-    val tmdb: Int?,
-    val imdb: String?,
-    val tvdb: Int?,
+    val trakt: Int? = null,
+    val slug: String? = null,
+    val tmdb: Int? = null,
+    val imdb: String? = null,
+    val tvdb: Int? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -80,13 +89,43 @@ data class TraktEpisode(
     val number: Int,
     val title: String,
     val ids: TraktIds,
-    val overview: String?,
-    val rating: Double?,
-    @Json(name = "first_aired") val firstAired: String?,
+    val overview: String? = null,
+    val rating: Double? = null,
+    @Json(name = "first_aired") val firstAired: String? = null,
 )
 
 @JsonClass(generateAdapter = true)
 data class TraktLikedList(
     val list: TraktList,
     @Json(name = "liked_at") val likedAt: String,
+)
+
+// Continue Watching models
+@JsonClass(generateAdapter = true)
+data class TraktWatchedShow(
+    val plays: Int,
+    @Json(name = "last_watched_at") val lastWatchedAt: String,
+    val show: TraktShow,
+    val seasons: List<TraktWatchedSeason> = emptyList(),
+) {
+    /** Returns (season, episode) of the next unwatched episode, or null if unknown. */
+    fun nextEpisode(): Pair<Int, Int>? {
+        if (seasons.isEmpty()) return null
+        val lastSeason = seasons.maxByOrNull { it.number } ?: return null
+        val lastEp = lastSeason.episodes.maxByOrNull { it.number } ?: return null
+        return Pair(lastSeason.number, lastEp.number + 1)
+    }
+}
+
+@JsonClass(generateAdapter = true)
+data class TraktWatchedSeason(
+    val number: Int,
+    val episodes: List<TraktWatchedEpisode> = emptyList(),
+)
+
+@JsonClass(generateAdapter = true)
+data class TraktWatchedEpisode(
+    val number: Int,
+    val plays: Int,
+    @Json(name = "last_watched_at") val lastWatchedAt: String? = null,
 )

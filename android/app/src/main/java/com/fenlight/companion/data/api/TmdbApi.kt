@@ -10,16 +10,16 @@ interface TmdbApi {
     // --- Discovery & Lists ---
 
     @GET("movie/popular")
-    suspend fun popularMovies(@Query("page") page: Int = 1): PagedResult<Movie>
+    suspend fun popularMovies(@Query("page") page: Int = 1, @Query("region") region: String? = null): PagedResult<Movie>
 
     @GET("trending/movie/day")
-    suspend fun trendingMovies(@Query("page") page: Int = 1): PagedResult<Movie>
+    suspend fun trendingMovies(@Query("page") page: Int = 1, @Query("region") region: String? = null): PagedResult<Movie>
 
     @GET("movie/now_playing")
-    suspend fun nowPlayingMovies(@Query("page") page: Int = 1): PagedResult<Movie>
+    suspend fun nowPlayingMovies(@Query("page") page: Int = 1, @Query("region") region: String? = null): PagedResult<Movie>
 
     @GET("movie/upcoming")
-    suspend fun upcomingMovies(@Query("page") page: Int = 1): PagedResult<Movie>
+    suspend fun upcomingMovies(@Query("page") page: Int = 1, @Query("region") region: String? = null): PagedResult<Movie>
 
     @GET("search/movie")
     suspend fun searchMovies(@Query("query") query: String, @Query("page") page: Int = 1): PagedResult<Movie>
@@ -28,6 +28,7 @@ interface TmdbApi {
     suspend fun discoverMovies(
         @QueryMap filters: Map<String, String>,
         @Query("page") page: Int = 1,
+        @Query("region") region: String? = null,
     ): PagedResult<Movie>
 
     @GET("movie/{id}")
@@ -39,16 +40,16 @@ interface TmdbApi {
     // --- TV Shows ---
 
     @GET("tv/popular")
-    suspend fun popularTv(@Query("page") page: Int = 1): PagedResult<TvShow>
+    suspend fun popularTv(@Query("page") page: Int = 1, @Query("region") region: String? = null): PagedResult<TvShow>
 
     @GET("trending/tv/day")
-    suspend fun trendingTv(@Query("page") page: Int = 1): PagedResult<TvShow>
+    suspend fun trendingTv(@Query("page") page: Int = 1, @Query("region") region: String? = null): PagedResult<TvShow>
 
     @GET("tv/on_the_air")
-    suspend fun onTheAirTv(@Query("page") page: Int = 1): PagedResult<TvShow>
+    suspend fun onTheAirTv(@Query("page") page: Int = 1, @Query("region") region: String? = null): PagedResult<TvShow>
 
     @GET("tv/airing_today")
-    suspend fun airingTodayTv(@Query("page") page: Int = 1): PagedResult<TvShow>
+    suspend fun airingTodayTv(@Query("page") page: Int = 1, @Query("region") region: String? = null): PagedResult<TvShow>
 
     @GET("search/tv")
     suspend fun searchTv(@Query("query") query: String, @Query("page") page: Int = 1): PagedResult<TvShow>
@@ -57,6 +58,7 @@ interface TmdbApi {
     suspend fun discoverTv(
         @QueryMap filters: Map<String, String>,
         @Query("page") page: Int = 1,
+        @Query("region") region: String? = null,
     ): PagedResult<TvShow>
 
     @GET("tv/{id}")

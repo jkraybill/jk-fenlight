@@ -206,11 +206,11 @@ fun SetupScreen(
                     OutlinedButton(
                         onClick = {
                             context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse("https://trakt.tv/activate"))
+                                Intent(Intent.ACTION_VIEW, Uri.parse("https://trakt.tv/activate/${state.traktUserCode}"))
                             )
                         },
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Open trakt.tv/activate") }
+                    ) { Text("Open trakt.tv/activate (code pre-filled)") }
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     TextButton(onClick = vm::cancelTraktAuth) { Text("Cancel") }
                 }
@@ -253,12 +253,20 @@ fun SetupScreen(
                     Spacer(Modifier.height(8.dp))
                     OutlinedButton(
                         onClick = {
+                            val rdUrl = state.rdDirectVerificationUrl.ifBlank { "https://real-debrid.com/device" }
                             context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse("https://real-debrid.com/device"))
+                                Intent(Intent.ACTION_VIEW, Uri.parse(rdUrl))
                             )
                         },
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Open real-debrid.com/device") }
+                    ) {
+                        Text(
+                            if (state.rdDirectVerificationUrl.isNotBlank())
+                                "Open real-debrid.com/device (code pre-filled)"
+                            else
+                                "Open real-debrid.com/device"
+                        )
+                    }
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     TextButton(onClick = vm::cancelRdAuth) { Text("Cancel") }
                 }

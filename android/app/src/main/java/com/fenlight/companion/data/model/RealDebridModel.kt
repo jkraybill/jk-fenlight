@@ -8,6 +8,7 @@ data class RdDeviceCode(
     @Json(name = "device_code") val deviceCode: String,
     @Json(name = "user_code") val userCode: String,
     @Json(name = "verification_url") val verificationUrl: String,
+    @Json(name = "direct_verification_url") val directVerificationUrl: String? = null,
     @Json(name = "expires_in") val expiresIn: Int,
     val interval: Int,
 )

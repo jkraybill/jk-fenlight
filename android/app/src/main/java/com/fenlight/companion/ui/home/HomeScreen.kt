@@ -16,6 +16,7 @@ import androidx.navigation.compose.rememberNavController
 import com.fenlight.companion.ui.movies.MovieBrowseScreen
 import com.fenlight.companion.ui.movies.MovieDetailScreen
 import com.fenlight.companion.ui.realdebrid.RdScreen
+import com.fenlight.companion.ui.tmdb.TmdbListsScreen
 import com.fenlight.companion.ui.trakt.TraktScreen
 import com.fenlight.companion.ui.tvshows.TvBrowseScreen
 import com.fenlight.companion.ui.tvshows.TvDetailScreen
@@ -23,12 +24,14 @@ import com.fenlight.companion.ui.tvshows.TvDetailScreen
 private sealed class TopDest(val route: String, val label: String, val icon: ImageVector) {
     object Movies : TopDest("movies", "Movies", Icons.Default.Movie)
     object TV : TopDest("tv", "TV Shows", Icons.Default.Tv)
+    object TmdbLists : TopDest("tmdb_lists", "TMDB Lists", Icons.Default.List)
     object Trakt : TopDest("trakt", "Trakt", Icons.Default.Star)
     object RealDebrid : TopDest("rd", "Real Debrid", Icons.Default.Cloud)
 }
 
 @Composable
 fun HomeScreen(
+    hasTmdbAuth: Boolean,
     hasTraktAuth: Boolean,
     hasRdAuth: Boolean,
     onGoToSettings: () -> Unit,
@@ -37,6 +40,7 @@ fun HomeScreen(
     val topDests = buildList {
         add(TopDest.Movies)
         add(TopDest.TV)
+        if (hasTmdbAuth) add(TopDest.TmdbLists)
         if (hasTraktAuth) add(TopDest.Trakt)
         if (hasRdAuth) add(TopDest.RealDebrid)
     }
@@ -93,6 +97,7 @@ fun HomeScreen(
                 val id = back.arguments?.getString("id")?.toIntOrNull() ?: return@composable
                 TvDetailScreen(tmdbId = id, onBack = { navController.popBackStack() })
             }
+            composable("tmdb_lists") { TmdbListsScreen() }
             composable("trakt") { TraktScreen() }
             composable("rd") { RdScreen() }
         }

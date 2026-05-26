@@ -38,6 +38,7 @@ data class SetupState(
     val rdPolling: Boolean = false,
     val rdAuthed: Boolean = false,
     val rdUserCode: String = "",
+    val rdDirectVerificationUrl: String = "",
     val rdError: String? = null,
     val setupComplete: Boolean = false,
 )
@@ -138,10 +139,10 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.update { it.copy(tmdbLoading = true, tmdbError = null) }
             try {
-                val tokenResp = app.tmdbApi.requestToken()
+                val tokenResp = app.buildTmdbV4Api("").createRequestToken(emptyMap())
                 val requestToken = tokenResp.requestToken
                 prefs.saveTmdbRequestToken(requestToken)
-                val authUrl = "https://www.themoviedb.org/authenticate/$requestToken?redirect_to=fenlight://tmdb-auth"
+                val authUrl = "https://www.themoviedb.org/auth/access?request_token=$requestToken"
                 _state.update { it.copy(tmdbLoading = false, tmdbPolling = true, tmdbAuthUrl = authUrl) }
                 // Clear the URL so LaunchedEffect only triggers once
                 delay(500)
@@ -233,7 +234,7 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
             _state.update { it.copy(rdLoading = true, rdError = null) }
             try {
                 val code = app.rdBaseApi.deviceCode(app.rdClientId)
-                _state.update { it.copy(rdLoading = false, rdPolling = true, rdUserCode = code.userCode) }
+                _state.update { it.copy(rdLoading = false, rdPolling = true, rdUserCode = code.userCode, rdDirectVerificationUrl = code.directVerificationUrl ?: "") }
                 pollRd(code.deviceCode, code.interval.toLong())
             } catch (e: Exception) {
                 _state.update { it.copy(rdLoading = false, rdError = "Failed to start Real Debrid auth: ${e.message}") }

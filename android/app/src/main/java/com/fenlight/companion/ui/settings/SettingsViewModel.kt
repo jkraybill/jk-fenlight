@@ -34,6 +34,7 @@ data class UpdateUiState(
 
 data class SettingsUiState(
     val checkUpdateOnStartup: Boolean = true,
+    val region: String = "",
     val update: UpdateUiState = UpdateUiState(),
     val currentVersion: String = BuildConfig.VERSION_NAME,
     val currentVersionCode: Int = BuildConfig.VERSION_CODE,
@@ -54,10 +55,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 _state.update { it.copy(checkUpdateOnStartup = enabled) }
             }
         }
+        viewModelScope.launch {
+            prefs.region.collect { r -> _state.update { it.copy(region = r) } }
+        }
     }
 
     fun toggleCheckUpdateOnStartup(enabled: Boolean) {
         viewModelScope.launch { prefs.setCheckUpdateOnStartup(enabled) }
+    }
+
+    fun setRegion(region: String) {
+        viewModelScope.launch { prefs.setRegion(region) }
     }
 
     fun checkForUpdate() {
