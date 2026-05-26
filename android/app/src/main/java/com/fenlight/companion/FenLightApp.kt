@@ -34,9 +34,7 @@ class FenLightApp : Application() {
         }
         .build()
 
-    // Bundled TMDB default key (same as FenLightPlus uses)
-    private val tmdbDefaultApiKey = "b370b60447737762ca38457bd77579b3"
-    // Bundled TMDB v4 read-access token (same as FenLightPlus)
+    // Bundled TMDB read access token — works as Bearer auth on both v3 and v4 endpoints
     val tmdbReadAccessToken = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiMzcwYjYwNDQ3NzM3NzYyY2EzODQ1N2JkNzc1NzliMyIsInN1YiI6IjYyN2FmY2E4Y2VhZjE2MDA2MTQ0NDE5MCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.D0kl9DwnJfkMpFILEKEKSJCMqHX1y_T8sCtDjQBzEHQ"
 
     // Bundled Trakt credentials (same as FenLightPlus defaults)
@@ -52,11 +50,11 @@ class FenLightApp : Application() {
             .client(
                 baseOkHttp.newBuilder()
                     .addInterceptor { chain ->
-                        val req = chain.request().newBuilder()
-                        val url = chain.request().url.newBuilder()
-                            .addQueryParameter("api_key", tmdbDefaultApiKey)
-                            .build()
-                        chain.proceed(req.url(url).build())
+                        chain.proceed(
+                            chain.request().newBuilder()
+                                .header("Authorization", "Bearer $tmdbReadAccessToken")
+                                .build()
+                        )
                     }
                     .build()
             )
