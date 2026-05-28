@@ -1,7 +1,10 @@
 package com.fenlight.companion.ui.movies
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -10,6 +13,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -18,7 +25,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.fenlight.companion.FenLightApp
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MovieDetailScreen(
     tmdbId: Int,
@@ -42,85 +48,142 @@ fun MovieDetailScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text(movie?.title ?: "") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-            )
-        },
-        floatingActionButton = {
+        bottomBar = {
             if (movie != null) {
-                ExtendedFloatingActionButton(
-                    onClick = { vm.playMovie(movie) },
-                    icon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
-                    text = { Text("Play on Kodi") },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                )
+                Surface(tonalElevation = 3.dp) {
+                    Button(
+                        onClick = { vm.playMovie(movie) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .navigationBarsPadding(),
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Play on Kodi")
+                    }
+                }
             }
         },
     ) { padding ->
         if (state.isLoading || movie == null) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
             return@Scaffold
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            // Backdrop
-            AsyncImage(
-                model = FenLightApp.backdropUrl(movie.backdropPath),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
-            )
-
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = padding.calculateBottomPadding())
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                // Backdrop with gradient scrim
+                Box {
                     AsyncImage(
-                        model = FenLightApp.posterUrl(movie.posterPath),
+                        model = FenLightApp.backdropUrl(movie.backdropPath),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.width(100.dp).aspectRatio(2f / 3f),
+                        modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
                     )
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(movie.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        movie.releaseDate?.take(4)?.let { Text("$it", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                        if (movie.voteAverage > 0) {
-                            Text("★ ${"%.1f".format(movie.voteAverage)} (${movie.voteCount})", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                        }
-                        movie.runtime?.let { Text("${it}m", style = MaterialTheme.typography.bodySmall) }
-                        movie.genres?.take(3)?.joinToString(" · ") { it.name }?.let {
-                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    0.2f to Color.Transparent,
+                                    1.0f to Color(0xFF111820),
+                                )
+                            )
+                    )
+                }
+
+                // Poster + info row overlapping the backdrop seam
+                Box(modifier = Modifier.offset(y = (-40).dp)) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        AsyncImage(
+                            model = FenLightApp.posterUrl(movie.posterPath),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .width(100.dp)
+                                .aspectRatio(2f / 3f)
+                                .shadow(16.dp, RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(8.dp)),
+                        )
+                        Column(
+                            modifier = Modifier.padding(top = 48.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(movie.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            movie.releaseDate?.take(4)?.let {
+                                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            if (movie.voteAverage > 0) {
+                                Text(
+                                    "★ ${"%.1f".format(movie.voteAverage)} (${movie.voteCount})",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                            movie.runtime?.let { Text("${it}m", style = MaterialTheme.typography.bodySmall) }
+                            movie.genres?.take(3)?.joinToString(" · ") { it.name }?.let {
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                            }
                         }
                     }
                 }
 
-                if (movie.overview.isNotBlank()) {
-                    Text("Overview", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Text(movie.overview, style = MaterialTheme.typography.bodyMedium)
-                }
+                // Content below the poster row
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp).offset(y = (-28).dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    if (movie.overview.isNotBlank()) {
+                        Text("Overview", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(movie.overview, style = MaterialTheme.typography.bodyMedium)
+                    }
 
-                val directors = movie.credits?.crew?.filter { it.job == "Director" }?.map { it.name }
-                if (!directors.isNullOrEmpty()) {
-                    Text("Director: ${directors.joinToString()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                    val directors = movie.credits?.crew?.filter { it.job == "Director" }?.map { it.name }
+                    if (!directors.isNullOrEmpty()) {
+                        Text(
+                            "Director: ${directors.joinToString()}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
 
-                val cast = movie.credits?.cast?.take(6)?.joinToString { it.name }
-                if (!cast.isNullOrBlank()) {
-                    Text("Cast: $cast", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                    val cast = movie.credits?.cast?.take(6)?.joinToString { it.name }
+                    if (!cast.isNullOrBlank()) {
+                        Text(
+                            "Cast: $cast",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
 
-                Spacer(Modifier.height(72.dp)) // space for FAB
+                    Spacer(Modifier.height(16.dp))
+                }
+            }
+
+            // Floating back button overlaid at top-start
+            Surface(
+                color = Color.Black.copy(alpha = 0.5f),
+                shape = CircleShape,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(8.dp),
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                }
             }
         }
     }

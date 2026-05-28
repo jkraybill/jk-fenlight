@@ -1,5 +1,6 @@
 package com.fenlight.companion.ui.tvshows
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,6 +14,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -102,12 +105,20 @@ fun TvDetailScreen(
                     .padding(padding)
                     .verticalScroll(rememberScrollState()),
             ) {
-                AsyncImage(
-                    model = FenLightApp.backdropUrl(show.backdropPath),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
-                )
+                // Backdrop with gradient scrim
+                Box {
+                    AsyncImage(
+                        model = FenLightApp.backdropUrl(show.backdropPath),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
+                    )
+                    Box(
+                        modifier = Modifier.matchParentSize().background(
+                            Brush.verticalGradient(0.2f to Color.Transparent, 1.0f to Color(0xFF111820))
+                        )
+                    )
+                }
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         AsyncImage(

@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -28,11 +29,12 @@ import com.fenlight.companion.ui.tvshows.TvDetailScreen
 private sealed class TopDest(val route: String, val label: String, @DrawableRes val iconRes: Int) {
     object Movies : TopDest("movies", "Movies", R.drawable.icon_movies)
     object TV : TopDest("tv", "TV Shows", R.drawable.icon_tv)
-    object TmdbLists : TopDest("tmdb_lists", "TMDB Lists", R.drawable.icon_tmdb)
+    object TmdbLists : TopDest("tmdb_lists", "Lists", R.drawable.icon_tmdb)
     object Trakt : TopDest("trakt", "Trakt", R.drawable.icon_trakt)
-    object RealDebrid : TopDest("rd", "Real Debrid", R.drawable.icon_realdebrid)
+    object RealDebrid : TopDest("rd", "Debrid", R.drawable.icon_realdebrid)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     hasTmdbAuth: Boolean,
@@ -49,9 +51,11 @@ fun HomeScreen(
         if (hasRdAuth) add(TopDest.RealDebrid)
     }
 
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
                 title = { Text("FenLight+ Companion") },
                 actions = {
@@ -59,6 +63,7 @@ fun HomeScreen(
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 },
+                scrollBehavior = scrollBehavior,
             )
         },
         bottomBar = {
