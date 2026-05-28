@@ -6,13 +6,14 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import coil.compose.AsyncImage
 import com.fenlight.companion.ui.movies.MovieBrowseScreen
 import com.fenlight.companion.ui.movies.MovieDetailScreen
 import com.fenlight.companion.ui.realdebrid.RdScreen
@@ -21,12 +22,12 @@ import com.fenlight.companion.ui.trakt.TraktScreen
 import com.fenlight.companion.ui.tvshows.TvBrowseScreen
 import com.fenlight.companion.ui.tvshows.TvDetailScreen
 
-private sealed class TopDest(val route: String, val label: String, val icon: ImageVector) {
-    object Movies : TopDest("movies", "Movies", Icons.Default.Movie)
-    object TV : TopDest("tv", "TV Shows", Icons.Default.Tv)
-    object TmdbLists : TopDest("tmdb_lists", "TMDB Lists", Icons.Default.List)
-    object Trakt : TopDest("trakt", "Trakt", Icons.Default.Star)
-    object RealDebrid : TopDest("rd", "Real Debrid", Icons.Default.Cloud)
+private sealed class TopDest(val route: String, val label: String, val iconUrl: String) {
+    object Movies : TopDest("movies", "Movies", "https://i.imgur.com/pmyCOx7.png")
+    object TV : TopDest("tv", "TV Shows", "https://i.imgur.com/R3NEEJl.png")
+    object TmdbLists : TopDest("tmdb_lists", "TMDB Lists", "https://i.imgur.com/bOqItvH.png")
+    object Trakt : TopDest("trakt", "Trakt", "https://i.imgur.com/sGq3ifV.png")
+    object RealDebrid : TopDest("rd", "Real Debrid", "https://i.imgur.com/DotYAc3.png")
 }
 
 @Composable
@@ -63,7 +64,13 @@ fun HomeScreen(
                 val currentDest = navBackStackEntry?.destination
                 topDests.forEach { dest ->
                     NavigationBarItem(
-                        icon = { Icon(dest.icon, contentDescription = dest.label) },
+                        icon = {
+                            AsyncImage(
+                                model = dest.iconUrl,
+                                contentDescription = dest.label,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        },
                         label = { Text(dest.label) },
                         selected = currentDest?.hierarchy?.any { it.route == dest.route } == true,
                         onClick = {

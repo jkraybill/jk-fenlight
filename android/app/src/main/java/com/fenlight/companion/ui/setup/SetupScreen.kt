@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 
 @Composable
 fun SetupScreen(
@@ -146,6 +147,7 @@ fun SetupScreen(
             subtitle = "Required only for personal lists",
             isDone = state.tmdbAuthed,
             enabled = state.kodiConnected,
+            iconUrl = "https://i.imgur.com/bOqItvH.png",
         ) {
             when {
                 state.tmdbAuthed -> {
@@ -186,6 +188,7 @@ fun SetupScreen(
             subtitle = "Next episodes and personal lists",
             isDone = state.traktAuthed,
             enabled = state.kodiConnected,
+            iconUrl = "https://i.imgur.com/sGq3ifV.png",
         ) {
             when {
                 state.traktAuthed -> {
@@ -234,6 +237,7 @@ fun SetupScreen(
             subtitle = "Browse your cloud files directly",
             isDone = state.rdAuthed,
             enabled = state.kodiConnected,
+            iconUrl = "https://i.imgur.com/DotYAc3.png",
         ) {
             when {
                 state.rdAuthed -> {
@@ -366,6 +370,7 @@ private fun SetupCard(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     enabled: Boolean = true,
+    iconUrl: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Card(
@@ -382,6 +387,14 @@ private fun SetupCard(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (iconUrl != null) {
+                    AsyncImage(
+                        model = iconUrl,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     if (subtitle != null) {
