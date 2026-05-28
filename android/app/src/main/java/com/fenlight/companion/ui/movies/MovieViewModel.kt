@@ -134,6 +134,7 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
                         title = m.title,
                         posterUrl = FenLightApp.posterUrl(m.posterPath),
                         rating = m.voteAverage.takeIf { it > 0 },
+                        backdropUrl = FenLightApp.backdropUrl(m.backdropPath),
                     )
                 }
                 _state.update {

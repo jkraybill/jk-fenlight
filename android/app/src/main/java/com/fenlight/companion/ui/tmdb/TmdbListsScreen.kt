@@ -65,6 +65,7 @@ fun TmdbListsScreen(
                         title = item.title ?: item.name ?: "Unknown",
                         posterUrl = FenLightApp.posterUrl(item.posterPath),
                         rating = null,
+                        backdropUrl = null,
                     )
                 }
                 PullToRefreshBox(

@@ -1,9 +1,11 @@
 package com.fenlight.companion.ui.trakt
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
@@ -12,7 +14,10 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -21,6 +26,14 @@ import com.fenlight.companion.data.model.TraktListItem
 import com.fenlight.companion.data.model.TraktWatchedShow
 import com.fenlight.companion.ui.components.ErrorMessage
 import com.fenlight.companion.ui.components.LoadingIndicator
+
+private fun placeholderColor(title: String): Color {
+    val colors = listOf(
+        Color(0xFF1C2D3E), Color(0xFF2E1C1C), Color(0xFF1E2040),
+        Color(0xFF1C2E28), Color(0xFF2A1C2E), Color(0xFF1A2C2C),
+    )
+    return colors[Math.abs(title.hashCode()) % colors.size]
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,24 +118,86 @@ private fun ContinueWatchingList(
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
         items(shows) { watched ->
             val next = watched.nextEpisode()
-            ListItem(
-                headlineContent = { Text(watched.show.title, fontWeight = FontWeight.SemiBold) },
-                supportingContent = {
-                    if (next != null) {
-                        Text("Next: S${next.first}E${next.second}", style = MaterialTheme.typography.bodySmall)
-                    } else {
-                        Text("Watched ${watched.plays} episode${if (watched.plays != 1) "s" else ""}", style = MaterialTheme.typography.bodySmall)
+            val initials = watched.show.title
+                .split(' ')
+                .take(2)
+                .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+                .joinToString("")
+            val progress = ((watched.plays % 20) / 20f).coerceIn(0f, 1f)
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                shape = RoundedCornerShape(10.dp),
+            ) {
+                Row(
+                    modifier = Modifier.padding(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    // Poster placeholder
+                    Box(
+                        modifier = Modifier
+                            .width(46.dp)
+                            .height(68.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(placeholderColor(watched.show.title)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = initials,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.7f),
+                        )
                     }
-                },
-                trailingContent = {
-                    if (next != null) {
-                        IconButton(onClick = { onPlay(watched) }) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = "Play next", tint = MaterialTheme.colorScheme.primary)
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = watched.show.title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (next != null) {
+                            Text(
+                                text = "Next · S${next.first}E${next.second}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            Text(
+                                text = "${watched.plays} episodes watched",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(2.dp)
+                                .clip(RoundedCornerShape(1.dp)),
+                        )
                     }
-                },
-            )
-            HorizontalDivider()
+
+                    // Play button
+                    FilledIconButton(
+                        onClick = { onPlay(watched) },
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = "Play",
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+            }
         }
     }
 }

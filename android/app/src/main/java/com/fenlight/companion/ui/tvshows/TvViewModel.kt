@@ -136,6 +136,7 @@ class TvViewModel(application: Application) : AndroidViewModel(application) {
                         title = show.name,
                         posterUrl = FenLightApp.posterUrl(show.posterPath),
                         rating = show.voteAverage.takeIf { it > 0 },
+                        backdropUrl = FenLightApp.backdropUrl(show.backdropPath),
                     )
                 }
                 _state.update {

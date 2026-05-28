@@ -1,9 +1,11 @@
 package com.fenlight.companion.ui.realdebrid
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
@@ -12,6 +14,8 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -20,6 +24,16 @@ import com.fenlight.companion.data.model.RdTorrent
 import com.fenlight.companion.data.model.RdTorrentInfo
 import com.fenlight.companion.ui.components.ErrorMessage
 import com.fenlight.companion.ui.components.LoadingIndicator
+
+private fun parseRdTitle(filename: String): String {
+    return filename
+        .substringBeforeLast('.')   // strip extension if it's a single file
+        .replace('.', ' ')
+        .replace('_', ' ')
+        .substringBefore('(').trim()
+        .substringBefore('[').trim()
+        .ifBlank { filename }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,7 +122,8 @@ private fun TorrentList(
                 onClick = { onTorrentClick(torrent) },
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Text(torrent.filename, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2)
+                    Text(parseRdTitle(torrent.filename), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    Text(torrent.filename, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(formatBytes(torrent.bytes), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         StatusChip(torrent.status, torrent.progress)
@@ -124,16 +139,16 @@ private fun TorrentList(
 
 @Composable
 private fun StatusChip(status: String, progress: Int) {
-    val color = when (status) {
-        "downloaded" -> MaterialTheme.colorScheme.primary
-        "downloading" -> MaterialTheme.colorScheme.tertiary
-        else -> MaterialTheme.colorScheme.error
+    val (dotColor, label) = when (status) {
+        "downloaded"  -> Color(0xFF4A8060) to "Downloaded"
+        "downloading" -> Color(0xFF5C7591) to "Downloading $progress%"
+        "error"       -> Color(0xFFCC4444) to "Error"
+        else          -> Color(0xFF4A5E70) to status.replaceFirstChar { it.uppercaseChar() }
     }
-    Text(
-        text = if (status == "downloading") "$status $progress%" else status,
-        style = MaterialTheme.typography.labelSmall,
-        color = color,
-    )
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(dotColor))
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -150,7 +165,7 @@ private fun TorrentFileList(
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(torrent.filename, maxLines = 1) },
+            title = { Text(parseRdTitle(torrent.filename), maxLines = 1) },
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") } },
         )
         if (files.isEmpty()) {
