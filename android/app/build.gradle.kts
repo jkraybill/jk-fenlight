@@ -1,3 +1,9 @@
+import java.util.Properties
+
+val props = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -15,10 +21,24 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.0.1"
+        buildConfigField("String", "TMDB_READ_ACCESS_TOKEN", "\"${props["TMDB_READ_ACCESS_TOKEN"]}\"")
+        buildConfigField("String", "TRAKT_CLIENT_ID", "\"${props["TRAKT_CLIENT_ID"]}\"")
+        buildConfigField("String", "TRAKT_CLIENT_SECRET", "\"${props["TRAKT_CLIENT_SECRET"]}\"")
+        buildConfigField("String", "RD_CLIENT_ID", "\"${props["RD_CLIENT_ID"]}\"")
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file(props["KEYSTORE_FILE"] as String)
+            storePassword = props["KEYSTORE_PASSWORD"] as String
+            keyAlias = "fenlight"
+            keyPassword = props["KEY_PASSWORD"] as String
+        }
     }
 
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
