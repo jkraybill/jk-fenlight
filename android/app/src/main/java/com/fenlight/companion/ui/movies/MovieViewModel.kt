@@ -25,6 +25,7 @@ data class MovieUiState(
     val tab: MovieBrowseTab = MovieBrowseTab.POPULAR,
     val items: List<PaginatedItem> = emptyList(),
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val hasMore: Boolean = true,
     val page: Int = 0,
     val error: String? = null,
@@ -42,15 +43,32 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
     private val _state = MutableStateFlow(MovieUiState())
     val state: StateFlow<MovieUiState> = _state.asStateFlow()
 
+    private companion object { const val CACHE_MS = 24 * 60 * 60 * 1000L }
+    private data class CachedTab(val items: List<PaginatedItem>, val page: Int, val hasMore: Boolean, val fetchedAt: Long)
+    private val tabCache = mutableMapOf<MovieBrowseTab, CachedTab>()
+
     init {
-        loadNextPage()
         loadMovieGenres()
+        val cached = tabCache[MovieBrowseTab.POPULAR]
+        if (cached == null || System.currentTimeMillis() - cached.fetchedAt > CACHE_MS) {
+            loadNextPage()
+        } else {
+            _state.update { it.copy(items = cached.items, page = cached.page, hasMore = cached.hasMore) }
+        }
     }
 
     fun selectTab(tab: MovieBrowseTab) {
         if (_state.value.tab == tab) return
+        // Save current tab to cache
+        val cur = _state.value
+        if (cur.items.isNotEmpty()) tabCache[cur.tab] = CachedTab(cur.items, cur.page, cur.hasMore, tabCache[cur.tab]?.fetchedAt ?: System.currentTimeMillis())
         if (tab == MovieBrowseTab.DISCOVER) {
             _state.update { MovieUiState(tab = tab, discoverShowForm = true, movieGenres = it.movieGenres) }
+            return
+        }
+        val cached = tabCache[tab]
+        if (cached != null && System.currentTimeMillis() - cached.fetchedAt < CACHE_MS) {
+            _state.update { MovieUiState(tab = tab, items = cached.items, page = cached.page, hasMore = cached.hasMore, movieGenres = it.movieGenres) }
         } else {
             _state.update { MovieUiState(tab = tab, movieGenres = it.movieGenres) }
             loadNextPage()
@@ -73,6 +91,12 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
 
     fun showDiscoverForm() {
         _state.update { it.copy(discoverShowForm = true, items = emptyList(), page = 0, hasMore = true) }
+    }
+
+    fun refresh() {
+        tabCache.remove(_state.value.tab)
+        _state.update { it.copy(isRefreshing = true, items = emptyList(), page = 0, hasMore = true, error = null) }
+        loadNextPage()
     }
 
     fun loadNextPage() {
@@ -113,15 +137,18 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
                 _state.update {
-                    it.copy(
+                    val updated = it.copy(
                         isLoading = false,
+                        isRefreshing = false,
                         items = (it.items + newItems).distinctBy { item -> item.id },
                         page = nextPage,
                         hasMore = nextPage < result.totalPages,
                     )
+                    if (nextPage == 1) tabCache[updated.tab] = CachedTab(updated.items, updated.page, updated.hasMore, System.currentTimeMillis())
+                    updated
                 }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message) }
+                _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.message) }
             }
         }
     }

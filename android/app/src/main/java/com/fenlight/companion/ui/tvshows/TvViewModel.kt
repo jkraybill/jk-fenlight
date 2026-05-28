@@ -26,6 +26,7 @@ data class TvUiState(
     val tab: TvBrowseTab = TvBrowseTab.POPULAR,
     val items: List<PaginatedItem> = emptyList(),
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val hasMore: Boolean = true,
     val page: Int = 0,
     val error: String? = null,
@@ -44,15 +45,32 @@ class TvViewModel(application: Application) : AndroidViewModel(application) {
     private val _state = MutableStateFlow(TvUiState())
     val state: StateFlow<TvUiState> = _state.asStateFlow()
 
+    private companion object { const val CACHE_MS = 24 * 60 * 60 * 1000L }
+    private data class CachedTab(val items: List<PaginatedItem>, val page: Int, val hasMore: Boolean, val fetchedAt: Long)
+    private val tabCache = mutableMapOf<TvBrowseTab, CachedTab>()
+
     init {
-        loadNextPage()
         loadTvGenres()
+        val cached = tabCache[TvBrowseTab.POPULAR]
+        if (cached == null || System.currentTimeMillis() - cached.fetchedAt > CACHE_MS) {
+            loadNextPage()
+        } else {
+            _state.update { it.copy(items = cached.items, page = cached.page, hasMore = cached.hasMore) }
+        }
     }
 
     fun selectTab(tab: TvBrowseTab) {
         if (_state.value.tab == tab) return
+        // Save current tab to cache
+        val cur = _state.value
+        if (cur.items.isNotEmpty()) tabCache[cur.tab] = CachedTab(cur.items, cur.page, cur.hasMore, tabCache[cur.tab]?.fetchedAt ?: System.currentTimeMillis())
         if (tab == TvBrowseTab.DISCOVER) {
             _state.update { TvUiState(tab = tab, discoverShowForm = true, tvGenres = it.tvGenres) }
+            return
+        }
+        val cached = tabCache[tab]
+        if (cached != null && System.currentTimeMillis() - cached.fetchedAt < CACHE_MS) {
+            _state.update { TvUiState(tab = tab, items = cached.items, page = cached.page, hasMore = cached.hasMore, tvGenres = it.tvGenres) }
         } else {
             _state.update { TvUiState(tab = tab, tvGenres = it.tvGenres) }
             loadNextPage()
@@ -75,6 +93,12 @@ class TvViewModel(application: Application) : AndroidViewModel(application) {
 
     fun showDiscoverForm() {
         _state.update { it.copy(discoverShowForm = true, items = emptyList(), page = 0, hasMore = true) }
+    }
+
+    fun refresh() {
+        tabCache.remove(_state.value.tab)
+        _state.update { it.copy(isRefreshing = true, items = emptyList(), page = 0, hasMore = true, error = null) }
+        loadNextPage()
     }
 
     fun loadNextPage() {
@@ -115,15 +139,18 @@ class TvViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
                 _state.update {
-                    it.copy(
+                    val updated = it.copy(
                         isLoading = false,
+                        isRefreshing = false,
                         items = (it.items + newItems).distinctBy { item -> item.id },
                         page = nextPage,
                         hasMore = nextPage < result.totalPages,
                     )
+                    if (nextPage == 1) tabCache[updated.tab] = CachedTab(updated.items, updated.page, updated.hasMore, System.currentTimeMillis())
+                    updated
                 }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message) }
+                _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.message) }
             }
         }
     }
