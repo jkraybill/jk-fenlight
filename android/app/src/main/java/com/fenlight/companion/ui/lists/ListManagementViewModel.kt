@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 data class ListManagementState(
+    val hasTraktAuth: Boolean = false,
+    val hasTmdbAuth: Boolean = false,
     val watchlistedIds: Set<Int> = emptySet(),
     val traktLists: List<TraktList> = emptyList(),
     val tmdbLists: List<TmdbList> = emptyList(),
@@ -22,7 +24,14 @@ class ListManagementViewModel(application: Application) : AndroidViewModel(appli
     private val _state = MutableStateFlow(ListManagementState())
     val state: StateFlow<ListManagementState> = _state.asStateFlow()
 
-    init { loadWatchlist() }
+    init {
+        viewModelScope.launch {
+            val traktToken = app.prefs.traktAccessToken.first()
+            val tmdbToken = app.prefs.tmdbAccessToken.first()
+            _state.update { it.copy(hasTraktAuth = traktToken.isNotBlank(), hasTmdbAuth = tmdbToken.isNotBlank()) }
+        }
+        loadWatchlist()
+    }
 
     private fun loadWatchlist() {
         viewModelScope.launch {

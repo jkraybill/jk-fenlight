@@ -23,6 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fenlight.companion.data.model.TraktList
 import com.fenlight.companion.data.model.TraktListItem
+import com.fenlight.companion.data.model.TraktShowProgress
 import com.fenlight.companion.data.model.TraktWatchedShow
 import com.fenlight.companion.ui.components.ErrorMessage
 import com.fenlight.companion.ui.components.LoadingIndicator
@@ -64,8 +65,8 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
                 return@Column
             }
 
-            TabRow(selectedTabIndex = state.tab.ordinal) {
-                listOf("Continue Watching", "My Lists", "Liked Lists").forEachIndexed { i, label ->
+            ScrollableTabRow(selectedTabIndex = state.tab.ordinal, edgePadding = 0.dp) {
+                listOf("Continue Watching", "My Lists", "Liked Lists", "Watchlist").forEachIndexed { i, label ->
                     Tab(
                         selected = state.tab.ordinal == i,
                         onClick = { vm.selectTab(TraktTab.values()[i]) },
@@ -90,7 +91,7 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
                 modifier = Modifier.fillMaxSize(),
             ) {
                 when (state.tab) {
-                    TraktTab.CONTINUE_WATCHING -> ContinueWatchingList(state.watchedShows, vm::playNextEpisode)
+                    TraktTab.CONTINUE_WATCHING -> ContinueWatchingList(state.watchedShows, state.showProgressMap, vm::playNextEpisode)
                     TraktTab.MY_LISTS -> TraktListList(state.myLists) { list ->
                         vm.loadListItems(list.slug, list.name, "me")
                     }
@@ -98,6 +99,7 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
                         val user = list.user?.username ?: "me"
                         vm.loadListItems(list.slug, list.name, user)
                     }
+                    TraktTab.WATCHLIST -> WatchlistTab(state.watchlistMovies, state.watchlistShows, vm::playListMovie)
                 }
             }
         }
@@ -107,23 +109,28 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
 @Composable
 private fun ContinueWatchingList(
     shows: List<TraktWatchedShow>,
+    progressMap: Map<String, TraktShowProgress>,
     onPlay: (TraktWatchedShow) -> Unit,
 ) {
     if (shows.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No recently watched shows", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("No shows in progress", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         return
     }
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
         items(shows) { watched ->
-            val next = watched.nextEpisode()
+            val slug = watched.show.ids.slug ?: ""
+            val prog = progressMap[slug]
+            val nextEp = prog?.nextEpisode
             val initials = watched.show.title
                 .split(' ')
                 .take(2)
                 .mapNotNull { it.firstOrNull()?.uppercaseChar() }
                 .joinToString("")
-            val progress = ((watched.plays % 20) / 20f).coerceIn(0f, 1f)
+            val progressFraction = prog?.let {
+                if (it.aired > 0) (it.completed.toFloat() / it.aired).coerceIn(0f, 1f) else 0f
+            } ?: 0f
 
             Card(
                 modifier = Modifier
@@ -136,7 +143,6 @@ private fun ContinueWatchingList(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.Top,
                 ) {
-                    // Poster placeholder
                     Box(
                         modifier = Modifier
                             .width(46.dp)
@@ -163,21 +169,28 @@ private fun ContinueWatchingList(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        if (next != null) {
+                        if (nextEp != null) {
+                            val label = if (!nextEp.title.isNullOrBlank())
+                                "Next · S${nextEp.season}E${nextEp.number} · ${nextEp.title}"
+                            else
+                                "Next · S${nextEp.season}E${nextEp.number}"
                             Text(
-                                text = "Next · S${next.first}E${next.second}",
+                                text = label,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
-                        } else {
+                        }
+                        if (prog != null) {
                             Text(
-                                text = "${watched.plays} episodes watched",
+                                text = "${prog.completed}/${prog.aired} episodes",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             )
                         }
                         LinearProgressIndicator(
-                            progress = { progress },
+                            progress = { progressFraction },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(2.dp)
@@ -185,7 +198,6 @@ private fun ContinueWatchingList(
                         )
                     }
 
-                    // Play button
                     FilledIconButton(
                         onClick = { onPlay(watched) },
                         modifier = Modifier.size(28.dp),
@@ -226,6 +238,65 @@ private fun TraktListList(
                     }
                     Text("${list.itemCount} items · ♥ ${list.likes}", style = MaterialTheme.typography.labelSmall)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WatchlistTab(
+    movies: List<TraktListItem>,
+    shows: List<TraktListItem>,
+    onPlayMovie: (TraktListItem) -> Unit,
+) {
+    if (movies.isEmpty() && shows.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Your watchlist is empty", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+        if (movies.isNotEmpty()) {
+            item {
+                Text(
+                    "Movies",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+            items(movies) { item ->
+                val movie = item.movie ?: return@items
+                ListItem(
+                    headlineContent = { Text(movie.title) },
+                    supportingContent = { movie.year?.let { Text(it.toString()) } },
+                    trailingContent = {
+                        if (movie.ids.tmdb != null) {
+                            IconButton(onClick = { onPlayMovie(item) }) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    },
+                )
+                HorizontalDivider()
+            }
+        }
+        if (shows.isNotEmpty()) {
+            item {
+                Text(
+                    "TV Shows",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+            items(shows) { item ->
+                val show = item.show ?: return@items
+                ListItem(
+                    headlineContent = { Text(show.title) },
+                    supportingContent = { show.year?.let { Text(it.toString()) } },
+                )
+                HorizontalDivider()
             }
         }
     }

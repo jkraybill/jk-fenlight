@@ -7,11 +7,15 @@ import com.fenlight.companion.FenLightApp
 import com.fenlight.companion.data.api.KodiRpc
 import com.fenlight.companion.data.model.TraktList
 import com.fenlight.companion.data.model.TraktListItem
+import com.fenlight.companion.data.model.TraktShowProgress
 import com.fenlight.companion.data.model.TraktWatchedShow
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-enum class TraktTab { CONTINUE_WATCHING, MY_LISTS, LIKED_LISTS }
+enum class TraktTab { CONTINUE_WATCHING, MY_LISTS, LIKED_LISTS, WATCHLIST }
 
 data class TraktUiState(
     val tab: TraktTab = TraktTab.CONTINUE_WATCHING,
@@ -19,6 +23,7 @@ data class TraktUiState(
     val isRefreshing: Boolean = false,
     val error: String? = null,
     val watchedShows: List<TraktWatchedShow> = emptyList(),
+    val showProgressMap: Map<String, TraktShowProgress> = emptyMap(),
     val myLists: List<TraktList> = emptyList(),
     val likedLists: List<TraktList> = emptyList(),
     val listItems: List<TraktListItem> = emptyList(),
@@ -28,6 +33,8 @@ data class TraktUiState(
     val selectedListName: String = "",
     val selectedListSlug: String = "",
     val selectedListUser: String = "me",
+    val watchlistMovies: List<TraktListItem> = emptyList(),
+    val watchlistShows: List<TraktListItem> = emptyList(),
     val playMessage: String? = null,
 )
 
@@ -60,12 +67,14 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
             TraktTab.CONTINUE_WATCHING -> _state.value.watchedShows.isNotEmpty()
             TraktTab.MY_LISTS -> _state.value.myLists.isNotEmpty()
             TraktTab.LIKED_LISTS -> _state.value.likedLists.isNotEmpty()
+            TraktTab.WATCHLIST -> _state.value.watchlistMovies.isNotEmpty() || _state.value.watchlistShows.isNotEmpty()
         }
         if (!force && hasData && age < CACHE_MS) return
         when (tab) {
             TraktTab.CONTINUE_WATCHING -> loadContinueWatching()
             TraktTab.MY_LISTS -> loadMyLists()
             TraktTab.LIKED_LISTS -> loadLikedLists()
+            TraktTab.WATCHLIST -> loadWatchlist()
         }
     }
 
@@ -74,10 +83,26 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
                 val api = app.buildAuthedTraktApi(app.getValidTraktAccessToken())
-                val shows = api.watchedShows()
-                val sorted = shows.sortedByDescending { it.lastWatchedAt }
+                val allShows = api.watchedShows()
+                    .sortedByDescending { it.lastWatchedAt }
+                    .take(30)
+
+                // Fetch per-show progress in parallel; ignore individual failures
+                val progressMap = coroutineScope {
+                    allShows.mapNotNull { show ->
+                        val slug = show.show.ids.slug ?: return@mapNotNull null
+                        async { runCatching { slug to api.showProgress(slug) }.getOrNull() }
+                    }.awaitAll().filterNotNull().toMap()
+                }
+
+                // Only keep shows where Trakt knows there is a next episode
+                val filtered = allShows.filter { show ->
+                    val slug = show.show.ids.slug ?: return@filter false
+                    progressMap[slug]?.nextEpisode != null
+                }
+
                 tabFetchedAt[TraktTab.CONTINUE_WATCHING] = System.currentTimeMillis()
-                _state.update { it.copy(isLoading = false, isRefreshing = false, watchedShows = sorted) }
+                _state.update { it.copy(isLoading = false, isRefreshing = false, watchedShows = filtered, showProgressMap = progressMap) }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.message) }
             }
@@ -107,6 +132,28 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
                 val liked = response.body() ?: emptyList()
                 tabFetchedAt[TraktTab.LIKED_LISTS] = System.currentTimeMillis()
                 _state.update { it.copy(isLoading = false, isRefreshing = false, likedLists = liked.map { it.list }) }
+            } catch (e: Exception) {
+                _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.message) }
+            }
+        }
+    }
+
+    private fun loadWatchlist() {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null) }
+            try {
+                val api = app.buildAuthedTraktApi(app.getValidTraktAccessToken())
+                coroutineScope {
+                    val movies = async { api.getWatchlist("movies") }
+                    val shows = async { api.getWatchlist("shows") }
+                    tabFetchedAt[TraktTab.WATCHLIST] = System.currentTimeMillis()
+                    _state.update { it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        watchlistMovies = movies.await(),
+                        watchlistShows = shows.await(),
+                    )}
+                }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.message) }
             }
@@ -170,16 +217,17 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
     fun playNextEpisode(watched: TraktWatchedShow) {
         viewModelScope.launch {
             val tmdbId = watched.show.ids.tmdb ?: return@launch
+            val slug = watched.show.ids.slug ?: return@launch
             val title = watched.show.title
             val year = watched.show.year ?: 0
-            val (season, ep) = watched.nextEpisode() ?: return@launch
+            val nextEp = _state.value.showProgressMap[slug]?.nextEpisode ?: return@launch
             try {
                 val host = app.prefs.kodiHost.first()
                 val port = app.prefs.kodiPort.first()
                 val user = app.prefs.kodiUser.first()
                 val pass = app.prefs.kodiPass.first()
-                KodiRpc(host, port, user, pass).playEpisodeViaFenLight(tmdbId, title, year, season, ep)
-                _state.update { it.copy(playMessage = "Playing S${season}E${ep} of $title on Kodi…") }
+                KodiRpc(host, port, user, pass).playEpisodeViaFenLight(tmdbId, title, year, nextEp.season, nextEp.number)
+                _state.update { it.copy(playMessage = "Playing S${nextEp.season}E${nextEp.number} of $title on Kodi…") }
             } catch (e: Exception) {
                 _state.update { it.copy(playMessage = "Failed: ${e.message}") }
             }

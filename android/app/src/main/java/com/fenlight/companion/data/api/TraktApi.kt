@@ -1,7 +1,6 @@
 package com.fenlight.companion.data.api
 
 import com.fenlight.companion.data.model.*
-import com.fenlight.companion.data.model.TraktWatchedShow
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -70,4 +69,7 @@ interface TraktApi {
 
     @GET("sync/watched/shows")
     suspend fun watchedShows(): List<TraktWatchedShow>
+
+    @GET("shows/{id}/progress/watched")
+    suspend fun showProgress(@Path("id") id: String): TraktShowProgress
 }

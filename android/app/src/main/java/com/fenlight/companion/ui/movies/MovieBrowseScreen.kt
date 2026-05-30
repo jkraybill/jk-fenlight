@@ -27,8 +27,13 @@ fun MovieBrowseScreen(
     var selectedItem by remember { mutableStateOf<PaginatedItem?>(null) }
 
     selectedItem?.let { item ->
-        // Long-press item stored — currently no sheet shown here; placeholder for future
-        selectedItem = null
+        ListManagementSheet(
+            mediaId = item.id,
+            mediaType = "movie",
+            title = item.title,
+            posterUrl = item.posterUrl,
+            onDismiss = { selectedItem = null },
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {

@@ -27,6 +27,16 @@ fun TvBrowseScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     var selectedItem by remember { mutableStateOf<PaginatedItem?>(null) }
 
+    selectedItem?.let { item ->
+        ListManagementSheet(
+            mediaId = item.id,
+            mediaType = "show",
+            title = item.title,
+            posterUrl = item.posterUrl,
+            onDismiss = { selectedItem = null },
+        )
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         ScrollableTabRow(selectedTabIndex = state.tab.ordinal, edgePadding = 0.dp) {
             listOf("Popular", "Trending", "On the Air", "Airing Today", "Search", "Discover")

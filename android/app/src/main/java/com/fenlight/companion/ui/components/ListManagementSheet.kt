@@ -126,56 +126,67 @@ fun ListManagementSheet(
             )
             HorizontalDivider()
 
-            // Trakt section
-            Text(
-                "Trakt",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
+            if (!state.hasTraktAuth && !state.hasTmdbAuth) {
+                Text(
+                    "Sign in to Trakt or TMDB in Settings to manage lists.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp),
+                )
+            }
 
-            val isWatchlisted = mediaId in state.watchlistedIds
-            ListItem(
-                headlineContent = { Text(if (isWatchlisted) "Remove from Watchlist" else "Add to Watchlist") },
-                leadingContent = {
-                    Icon(
-                        if (isWatchlisted) Icons.Default.Star else Icons.Outlined.Star,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                },
-                modifier = Modifier.clickable {
-                    if (isWatchlisted) vm.removeFromTraktWatchlist(mediaId, mediaType)
-                    else vm.addToTraktWatchlist(mediaId, mediaType)
-                    onDismiss()
-                },
-            )
-            ListItem(
-                headlineContent = { Text("Add to Trakt List…") },
-                leadingContent = { Icon(Icons.Default.PlaylistAdd, contentDescription = null) },
-                modifier = Modifier.clickable {
-                    vm.loadTraktLists()
-                    showTraktListPicker = true
-                },
-            )
+            // Trakt section — only when authenticated
+            if (state.hasTraktAuth) {
+                Text(
+                    "Trakt",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+                val isWatchlisted = mediaId in state.watchlistedIds
+                ListItem(
+                    headlineContent = { Text(if (isWatchlisted) "Remove from Watchlist" else "Add to Watchlist") },
+                    leadingContent = {
+                        Icon(
+                            if (isWatchlisted) Icons.Default.Star else Icons.Outlined.Star,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        if (isWatchlisted) vm.removeFromTraktWatchlist(mediaId, mediaType)
+                        else vm.addToTraktWatchlist(mediaId, mediaType)
+                        onDismiss()
+                    },
+                )
+                ListItem(
+                    headlineContent = { Text("Add to Trakt List…") },
+                    leadingContent = { Icon(Icons.Default.PlaylistAdd, contentDescription = null) },
+                    modifier = Modifier.clickable {
+                        vm.loadTraktLists()
+                        showTraktListPicker = true
+                    },
+                )
+            }
 
-            HorizontalDivider()
-
-            // TMDB section
-            Text(
-                "TMDB",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-            ListItem(
-                headlineContent = { Text("Add to TMDB List…") },
-                leadingContent = { Icon(Icons.Default.PlaylistAdd, contentDescription = null) },
-                modifier = Modifier.clickable {
-                    vm.loadTmdbLists()
-                    showTmdbListPicker = true
-                },
-            )
+            // TMDB section — only when authenticated
+            if (state.hasTmdbAuth) {
+                if (state.hasTraktAuth) HorizontalDivider()
+                Text(
+                    "TMDB",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+                ListItem(
+                    headlineContent = { Text("Add to TMDB List…") },
+                    leadingContent = { Icon(Icons.Default.PlaylistAdd, contentDescription = null) },
+                    modifier = Modifier.clickable {
+                        vm.loadTmdbLists()
+                        showTmdbListPicker = true
+                    },
+                )
+            }
         }
     }
 }

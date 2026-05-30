@@ -107,15 +107,22 @@ data class TraktWatchedShow(
     @Json(name = "last_watched_at") val lastWatchedAt: String,
     val show: TraktShow,
     val seasons: List<TraktWatchedSeason> = emptyList(),
-) {
-    /** Returns (season, episode) of the next unwatched episode, or null if unknown. */
-    fun nextEpisode(): Pair<Int, Int>? {
-        if (seasons.isEmpty()) return null
-        val lastSeason = seasons.maxByOrNull { it.number } ?: return null
-        val lastEp = lastSeason.episodes.maxByOrNull { it.number } ?: return null
-        return Pair(lastSeason.number, lastEp.number + 1)
-    }
-}
+)
+
+@JsonClass(generateAdapter = true)
+data class TraktShowProgress(
+    val aired: Int,
+    val completed: Int,
+    @Json(name = "next_episode") val nextEpisode: TraktProgressEpisode?,
+    @Json(name = "last_episode") val lastEpisode: TraktProgressEpisode?,
+)
+
+@JsonClass(generateAdapter = true)
+data class TraktProgressEpisode(
+    val season: Int,
+    val number: Int,
+    val title: String? = null,
+)
 
 @JsonClass(generateAdapter = true)
 data class TraktWatchedSeason(
