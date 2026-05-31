@@ -32,7 +32,7 @@ interface RealDebridApi {
     suspend fun refreshToken(
         @Field("client_id") clientId: String,
         @Field("client_secret") clientSecret: String,
-        @Field("refresh_token") refreshToken: String,
+        @Field("code") refreshToken: String,
         @Field("grant_type") grantType: String = "http://oauth.net/grant_type/device/1.0",
     ): RdToken
 

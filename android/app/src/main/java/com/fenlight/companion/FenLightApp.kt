@@ -3,6 +3,8 @@ package com.fenlight.companion
 import android.app.Application
 import com.fenlight.companion.data.api.RealDebridApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import com.fenlight.companion.data.api.TmdbApi
 import com.fenlight.companion.data.api.TmdbV4Api
 import com.fenlight.companion.data.api.TraktApi
@@ -122,6 +124,9 @@ class FenLightApp : Application() {
             .create(TraktApi::class.java)
     }
 
+    private val rdRefreshMutex = Mutex()
+    private val traktRefreshMutex = Mutex()
+
     // RD base (no auth) for device code / credential exchange
     val rdBaseApi: RealDebridApi by lazy {
         Retrofit.Builder()
@@ -151,10 +156,10 @@ class FenLightApp : Application() {
             .create(RealDebridApi::class.java)
     }
 
-    suspend fun getValidTraktAccessToken(): String {
+    suspend fun getValidTraktAccessToken(): String = traktRefreshMutex.withLock {
         val expiresAt = prefs.traktExpiresAt.first()
         val accessToken = prefs.traktAccessToken.first()
-        if (System.currentTimeMillis() < expiresAt - 5 * 60 * 1000L) return accessToken
+        if (System.currentTimeMillis() < expiresAt - 5 * 60 * 1000L) return@withLock accessToken
         val refreshToken = prefs.traktRefreshToken.first()
         val newToken = traktApi.refreshToken(mapOf(
             "refresh_token" to refreshToken,
@@ -163,19 +168,19 @@ class FenLightApp : Application() {
             "grant_type" to "refresh_token",
         ))
         prefs.saveTraktTokens(newToken.accessToken, newToken.refreshToken, newToken.expiresIn)
-        return newToken.accessToken
+        newToken.accessToken
     }
 
-    suspend fun getValidRdAccessToken(): String {
+    suspend fun getValidRdAccessToken(): String = rdRefreshMutex.withLock {
         val expiresAt = prefs.rdExpiresAt.first()
         val accessToken = prefs.rdAccessToken.first()
-        if (System.currentTimeMillis() < expiresAt - 5 * 60 * 1000L) return accessToken
+        if (System.currentTimeMillis() < expiresAt - 5 * 60 * 1000L) return@withLock accessToken
         val clientId = prefs.rdClientId.first()
         val clientSecret = prefs.rdClientSecret.first()
         val refreshToken = prefs.rdRefreshToken.first()
         val newToken = rdBaseApi.refreshToken(clientId, clientSecret, refreshToken)
         prefs.saveRdTokens(newToken.accessToken, newToken.refreshToken, clientId, clientSecret, newToken.expiresIn)
-        return newToken.accessToken
+        newToken.accessToken
     }
 
     companion object {
