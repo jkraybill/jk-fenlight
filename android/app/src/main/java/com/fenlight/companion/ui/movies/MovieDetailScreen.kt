@@ -145,14 +145,14 @@ fun MovieDetailScreen(
                     modifier = Modifier.padding(horizontal = 16.dp).offset(y = (-28).dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    movie.belongsToCollection?.name?.takeIf { it.isNotBlank() }?.let { seriesName ->
-                        Text("Series", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Text(seriesName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
-                    }
-
                     if (movie.overview.isNotBlank()) {
                         Text("Overview", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Text(movie.overview, style = MaterialTheme.typography.bodyMedium)
+                    }
+
+                    movie.belongsToCollection?.name?.takeIf { it.isNotBlank() }?.let { seriesName ->
+                        Text("Series", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(seriesName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
                     }
 
                     val directors = movie.credits?.crew?.filter { it.job == "Director" }?.map { it.name }
