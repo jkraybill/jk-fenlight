@@ -18,6 +18,15 @@ data class Movie(
     val credits: Credits?,
     val videos: VideoResults?,
     val adult: Boolean = false,
+    @Json(name = "belongs_to_collection") val belongsToCollection: MovieCollection? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class MovieCollection(
+    val id: Int,
+    val name: String,
+    @Json(name = "poster_path") val posterPath: String? = null,
+    @Json(name = "backdrop_path") val backdropPath: String? = null,
 )
 
 @JsonClass(generateAdapter = true)
