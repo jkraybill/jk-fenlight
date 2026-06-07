@@ -32,8 +32,9 @@ class PersonViewModel(application: Application) : AndroidViewModel(application) 
                 val castCredits = (person.combinedCredits?.cast ?: emptyList())
                     .filter { it.mediaType == "movie" || it.mediaType == "tv" }
                     .filter { !excludeAdult || !it.adult }
-                // Merge cast and crew, preferring cast entries, dedup by id
+                // Merge cast and director/creator/writer crew credits, dedup by id, preferring cast entries
                 val crewCredits = (person.combinedCredits?.crew ?: emptyList())
+                    .filter { it.job == "Director" || it.job == "Creator" || it.job == "Writer" }
                     .filter { it.mediaType == "movie" || it.mediaType == "tv" }
                     .filter { !excludeAdult || !it.adult }
                 val castIds = castCredits.map { it.id }.toSet()
