@@ -54,23 +54,36 @@ object KodiDiscovery {
             .url("http://$host:$port/jsonrpc")
             .post(body.toRequestBody(jsonType))
             .build()
-        val resp = scanClient.newCall(req).execute()
-        resp.isSuccessful && JSONObject(resp.body?.string() ?: "{}").optString("result") == "pong"
+        scanClient.newCall(req).execute().use { resp ->
+            when {
+                // Open (anonymous) Kodi: confirm via the pong response.
+                resp.isSuccessful -> JSONObject(resp.body?.string() ?: "{}").optString("result") == "pong"
+                // Password-protected Kodi: /jsonrpc requires Basic auth and returns 401.
+                // Treat that as a discovered Kodi (the name just can't be read).
+                resp.code == 401 -> true
+                else -> false
+            }
+        }
     } catch (_: Exception) {
         false
     }
 
-    /** The friendly name configured in Kodi → Settings → Services → Device name. */
+    /**
+     * The friendly name configured in Kodi → Settings → Services → Device name.
+     * Returns null when the name can't be read — e.g. Kodi requires a password
+     * (HTTP 401) — so discovery falls back to the "Kodi @ <ip>" label.
+     */
     private fun fetchDeviceName(host: String, port: Int): String? = try {
         val body = """{"jsonrpc":"2.0","method":"Settings.GetSettingValue","params":{"setting":"services.devicename"},"id":1}"""
         val req = Request.Builder()
             .url("http://$host:$port/jsonrpc")
             .post(body.toRequestBody(jsonType))
             .build()
-        val resp = scanClient.newCall(req).execute()
-        if (!resp.isSuccessful) null
-        else JSONObject(resp.body?.string() ?: "{}")
-            .optJSONObject("result")?.optString("value")?.takeIf { it.isNotBlank() }
+        scanClient.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) null
+            else JSONObject(resp.body?.string() ?: "{}")
+                .optJSONObject("result")?.optString("value")?.takeIf { it.isNotBlank() }
+        }
     } catch (_: Exception) {
         null
     }
