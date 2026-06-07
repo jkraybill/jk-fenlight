@@ -94,4 +94,20 @@ interface TraktApi {
         @Query("limit") limit: Int = 50,
         @Query("extended") extended: String = "full",
     ): Response<List<TraktHistoryEntry>>
+
+    @GET("movies/trending")
+    suspend fun moviesTrending(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20,
+        @Query("extended") extended: String = "full",
+        @Query("countries") countries: String? = null,
+    ): Response<List<TraktTrendingMovie>>
+
+    @GET("shows/trending")
+    suspend fun showsTrending(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20,
+        @Query("extended") extended: String = "full",
+        @Query("countries") countries: String? = null,
+    ): Response<List<TraktTrendingShow>>
 }

@@ -151,3 +151,15 @@ data class TraktHistoryEntry(
     val show: TraktShow? = null,
     val episode: TraktEpisode? = null,
 )
+
+@JsonClass(generateAdapter = true)
+data class TraktTrendingMovie(
+    val watchers: Int,
+    val movie: TraktMovie,
+)
+
+@JsonClass(generateAdapter = true)
+data class TraktTrendingShow(
+    val watchers: Int,
+    val show: TraktShow,
+)

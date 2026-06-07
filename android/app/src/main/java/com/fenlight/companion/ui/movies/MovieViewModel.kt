@@ -9,9 +9,12 @@ import com.fenlight.companion.data.model.Genre
 import com.fenlight.companion.data.model.Movie
 import com.fenlight.companion.ui.components.PaginatedItem
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 
 enum class MovieBrowseTab { POPULAR, TRENDING, NOW_PLAYING, UPCOMING, SEARCH, DISCOVER }
 
@@ -117,9 +120,48 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val region = app.prefs.region.first().takeIf { it.isNotBlank() }
                 val excludeAdult = app.prefs.excludeAdult.first()
+
+                if (s.tab == MovieBrowseTab.TRENDING) {
+                    val countries = region?.lowercase()
+                    val response = app.traktApi.moviesTrending(nextPage, countries = countries)
+                    val traktItems = response.body() ?: emptyList()
+                    val totalPages = response.headers()["X-Pagination-Page-Count"]?.toIntOrNull() ?: 1
+                    val newItems = supervisorScope {
+                        traktItems
+                            .filter { it.movie.ids.tmdb != null }
+                            .map { trending ->
+                                async {
+                                    val tmdbId = trending.movie.ids.tmdb!!
+                                    runCatching {
+                                        val detail = app.tmdbApi.movieDetail(tmdbId, append = "")
+                                        if (excludeAdult && detail.adult) return@runCatching null
+                                        PaginatedItem(
+                                            id = detail.id,
+                                            title = detail.title,
+                                            posterUrl = FenLightApp.posterUrl(detail.posterPath),
+                                            rating = detail.voteAverage.takeIf { it > 0 },
+                                            backdropUrl = FenLightApp.backdropUrl(detail.backdropPath),
+                                        )
+                                    }.getOrNull()
+                                }
+                            }.awaitAll().filterNotNull()
+                    }
+                    _state.update {
+                        val updated = it.copy(
+                            isLoading = false,
+                            isRefreshing = false,
+                            items = (it.items + newItems).distinctBy { item -> item.id },
+                            page = nextPage,
+                            hasMore = nextPage < totalPages,
+                        )
+                        if (nextPage == 1) tabCache[updated.tab] = CachedTab(updated.items, updated.page, updated.hasMore, System.currentTimeMillis())
+                        updated
+                    }
+                    return@launch
+                }
+
                 val result = when (s.tab) {
                     MovieBrowseTab.POPULAR -> app.tmdbApi.popularMovies(nextPage, region = region)
-                    MovieBrowseTab.TRENDING -> app.tmdbApi.trendingMovies(nextPage, region = region)
                     MovieBrowseTab.NOW_PLAYING -> app.tmdbApi.nowPlayingMovies(nextPage, region = region)
                     MovieBrowseTab.UPCOMING -> app.tmdbApi.upcomingMovies(nextPage, region = region)
                     MovieBrowseTab.SEARCH -> app.tmdbApi.searchMovies(s.searchQuery, nextPage, includeAdult = !excludeAdult)
@@ -138,18 +180,19 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
                         }
                         app.tmdbApi.discoverMovies(filters, nextPage, region = region)
                     }
+                    MovieBrowseTab.TRENDING -> error("handled above")
                 }
                 val newItems = result.results
                     .filter { !excludeAdult || !it.adult }
                     .map { m ->
-                    PaginatedItem(
-                        id = m.id,
-                        title = m.title,
-                        posterUrl = FenLightApp.posterUrl(m.posterPath),
-                        rating = m.voteAverage.takeIf { it > 0 },
-                        backdropUrl = FenLightApp.backdropUrl(m.backdropPath),
-                    )
-                }
+                        PaginatedItem(
+                            id = m.id,
+                            title = m.title,
+                            posterUrl = FenLightApp.posterUrl(m.posterPath),
+                            rating = m.voteAverage.takeIf { it > 0 },
+                            backdropUrl = FenLightApp.backdropUrl(m.backdropPath),
+                        )
+                    }
                 _state.update {
                     val updated = it.copy(
                         isLoading = false,

@@ -10,9 +10,12 @@ import com.fenlight.companion.data.model.Season
 import com.fenlight.companion.data.model.TvShow
 import com.fenlight.companion.ui.components.PaginatedItem
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 
 enum class TvBrowseTab { POPULAR, TRENDING, ON_THE_AIR, AIRING_TODAY, SEARCH, DISCOVER }
 
@@ -119,9 +122,47 @@ class TvViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val region = app.prefs.region.first().takeIf { it.isNotBlank() }
                 val excludeAdult = app.prefs.excludeAdult.first()
+
+                if (s.tab == TvBrowseTab.TRENDING) {
+                    val countries = region?.lowercase()
+                    val response = app.traktApi.showsTrending(nextPage, countries = countries)
+                    val traktItems = response.body() ?: emptyList()
+                    val totalPages = response.headers()["X-Pagination-Page-Count"]?.toIntOrNull() ?: 1
+                    val newItems = supervisorScope {
+                        traktItems
+                            .filter { it.show.ids.tmdb != null }
+                            .map { trending ->
+                                async {
+                                    val tmdbId = trending.show.ids.tmdb!!
+                                    runCatching {
+                                        val detail = app.tmdbApi.tvDetail(tmdbId, append = "")
+                                        PaginatedItem(
+                                            id = detail.id,
+                                            title = detail.name,
+                                            posterUrl = FenLightApp.posterUrl(detail.posterPath),
+                                            rating = detail.voteAverage.takeIf { it > 0 },
+                                            backdropUrl = FenLightApp.backdropUrl(detail.backdropPath),
+                                        )
+                                    }.getOrNull()
+                                }
+                            }.awaitAll().filterNotNull()
+                    }
+                    _state.update {
+                        val updated = it.copy(
+                            isLoading = false,
+                            isRefreshing = false,
+                            items = (it.items + newItems).distinctBy { item -> item.id },
+                            page = nextPage,
+                            hasMore = nextPage < totalPages,
+                        )
+                        if (nextPage == 1) tabCache[updated.tab] = CachedTab(updated.items, updated.page, updated.hasMore, System.currentTimeMillis())
+                        updated
+                    }
+                    return@launch
+                }
+
                 val result = when (s.tab) {
                     TvBrowseTab.POPULAR -> app.tmdbApi.popularTv(nextPage, region = region)
-                    TvBrowseTab.TRENDING -> app.tmdbApi.trendingTv(nextPage, region = region)
                     TvBrowseTab.ON_THE_AIR -> app.tmdbApi.onTheAirTv(nextPage, region = region)
                     TvBrowseTab.AIRING_TODAY -> app.tmdbApi.airingTodayTv(nextPage, region = region)
                     TvBrowseTab.SEARCH -> app.tmdbApi.searchTv(s.searchQuery, nextPage, includeAdult = !excludeAdult)
@@ -140,6 +181,7 @@ class TvViewModel(application: Application) : AndroidViewModel(application) {
                         }
                         app.tmdbApi.discoverTv(filters, nextPage, region = region)
                     }
+                    TvBrowseTab.TRENDING -> error("handled above")
                 }
                 val newItems = result.results.map { show ->
                     PaginatedItem(
