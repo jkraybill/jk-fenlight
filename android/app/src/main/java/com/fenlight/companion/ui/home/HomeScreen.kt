@@ -178,6 +178,7 @@ fun HomeScreen(
                     tmdbId = id,
                     onBack = { navController.popBackStack() },
                     onPersonClick = { personId -> navController.navigate("person/$personId") },
+                    onMovieClick = { movieId -> navController.navigate("movie_detail/$movieId") },
                 )
             }
             composable("tv") {

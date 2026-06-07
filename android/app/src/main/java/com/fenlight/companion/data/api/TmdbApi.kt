@@ -47,6 +47,9 @@ interface TmdbApi {
         @Query("append_to_response") append: String = "credits,videos,images",
     ): Movie
 
+    @GET("collection/{id}")
+    suspend fun collectionDetail(@Path("id") id: Int): MovieCollectionDetail
+
     // --- TV Shows ---
 
     @GET("tv/popular")
