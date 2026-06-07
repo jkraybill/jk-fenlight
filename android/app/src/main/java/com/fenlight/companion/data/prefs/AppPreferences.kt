@@ -34,6 +34,10 @@ class AppPreferences(private val context: Context) {
         private val CHECK_UPDATE_ON_STARTUP = booleanPreferencesKey("check_update_on_startup")
         private val REGION = stringPreferencesKey("region")
         private val EXCLUDE_ADULT = booleanPreferencesKey("exclude_adult")
+
+        private val TMDB_USERNAME = stringPreferencesKey("tmdb_username")
+        private val TRAKT_USERNAME = stringPreferencesKey("trakt_username")
+        private val RD_USERNAME = stringPreferencesKey("rd_username")
     }
 
     val kodiHost: Flow<String> = context.dataStore.data.map { it[KODI_HOST] ?: "" }
@@ -58,6 +62,10 @@ class AppPreferences(private val context: Context) {
     val checkUpdateOnStartup: Flow<Boolean> = context.dataStore.data.map { it[CHECK_UPDATE_ON_STARTUP] ?: true }
     val region: Flow<String> = context.dataStore.data.map { it[REGION] ?: "" }
     val excludeAdult: Flow<Boolean> = context.dataStore.data.map { it[EXCLUDE_ADULT] ?: true }
+
+    val tmdbUsername: Flow<String> = context.dataStore.data.map { it[TMDB_USERNAME] ?: "" }
+    val traktUsername: Flow<String> = context.dataStore.data.map { it[TRAKT_USERNAME] ?: "" }
+    val rdUsername: Flow<String> = context.dataStore.data.map { it[RD_USERNAME] ?: "" }
 
     suspend fun setCheckUpdateOnStartup(enabled: Boolean) {
         context.dataStore.edit { it[CHECK_UPDATE_ON_STARTUP] = enabled }
@@ -98,6 +106,7 @@ class AppPreferences(private val context: Context) {
             it.remove(TMDB_ACCESS_TOKEN)
             it.remove(TMDB_ACCOUNT_ID)
             it.remove(TMDB_REQUEST_TOKEN)
+            it.remove(TMDB_USERNAME)
         }
     }
 
@@ -114,6 +123,7 @@ class AppPreferences(private val context: Context) {
             it.remove(TRAKT_ACCESS_TOKEN)
             it.remove(TRAKT_REFRESH_TOKEN)
             it.remove(TRAKT_EXPIRES_AT)
+            it.remove(TRAKT_USERNAME)
         }
     }
 
@@ -140,6 +150,19 @@ class AppPreferences(private val context: Context) {
             it.remove(RD_CLIENT_ID)
             it.remove(RD_CLIENT_SECRET)
             it.remove(RD_EXPIRES_AT)
+            it.remove(RD_USERNAME)
         }
+    }
+
+    suspend fun saveTmdbUsername(username: String) {
+        context.dataStore.edit { if (username.isBlank()) it.remove(TMDB_USERNAME) else it[TMDB_USERNAME] = username }
+    }
+
+    suspend fun saveTraktUsername(username: String) {
+        context.dataStore.edit { if (username.isBlank()) it.remove(TRAKT_USERNAME) else it[TRAKT_USERNAME] = username }
+    }
+
+    suspend fun saveRdUsername(username: String) {
+        context.dataStore.edit { if (username.isBlank()) it.remove(RD_USERNAME) else it[RD_USERNAME] = username }
     }
 }

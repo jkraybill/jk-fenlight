@@ -8,6 +8,8 @@ import com.fenlight.companion.data.api.KodiRpc
 import com.fenlight.companion.data.model.Genre
 import com.fenlight.companion.data.model.Movie
 import com.fenlight.companion.ui.components.PaginatedItem
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -44,6 +46,7 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
     val state: StateFlow<MovieUiState> = _state.asStateFlow()
 
     private companion object { const val CACHE_MS = 24 * 60 * 60 * 1000L }
+    private var searchJob: Job? = null
     private data class CachedTab(val items: List<PaginatedItem>, val page: Int, val hasMore: Boolean, val fetchedAt: Long)
     private val tabCache = mutableMapOf<MovieBrowseTab, CachedTab>()
 
@@ -77,7 +80,13 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onSearchQueryChange(q: String) {
         _state.update { it.copy(searchQuery = q, items = emptyList(), page = 0, hasMore = true) }
-        if (q.length >= 2) loadNextPage()
+        searchJob?.cancel()
+        if (q.length >= 2) {
+            searchJob = viewModelScope.launch {
+                delay(1000L)
+                loadNextPage()
+            }
+        }
     }
 
     fun onDiscoverFilterChange(filters: DiscoverFilters) {

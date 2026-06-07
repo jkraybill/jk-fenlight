@@ -26,6 +26,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.fenlight.companion.data.model.TraktHistoryEntry
 import com.fenlight.companion.data.model.TraktList
 import com.fenlight.companion.data.model.TraktListItem
 import com.fenlight.companion.data.model.TraktShowProgress
@@ -130,7 +131,7 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
             }
 
             ScrollableTabRow(selectedTabIndex = state.tab.ordinal, edgePadding = 0.dp) {
-                listOf("Continue Watching", "My Lists", "Liked Lists", "Watchlist").forEachIndexed { i, label ->
+                listOf("Continue Watching", "My Lists", "Liked Lists", "Watchlist", "Recent").forEachIndexed { i, label ->
                     Tab(
                         selected = state.tab.ordinal == i,
                         onClick = { vm.selectTab(TraktTab.values()[i]) },
@@ -169,6 +170,12 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
                         },
                     )
                     TraktTab.WATCHLIST -> WatchlistTab(state.watchlistMovies, state.watchlistShows, vm::playListMovie)
+                    TraktTab.RECENT -> RecentTab(
+                        history = state.recentHistory,
+                        hasMore = state.recentHistoryHasMore,
+                        isLoadingMore = state.recentHistoryIsLoadingMore,
+                        onLoadMore = vm::loadMoreRecent,
+                    )
                 }
             }
         }
@@ -373,6 +380,66 @@ private fun WatchlistTab(
                     supportingContent = { show.year?.let { Text(it.toString()) } },
                 )
                 HorizontalDivider()
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecentTab(
+    history: List<TraktHistoryEntry>,
+    hasMore: Boolean,
+    isLoadingMore: Boolean,
+    onLoadMore: () -> Unit,
+) {
+    if (history.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("No watch history found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
+    val listState = rememberLazyListState()
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            last >= history.size - 5 && !isLoadingMore && hasMore
+        }
+    }
+    LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) onLoadMore() }
+
+    LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+        items(history, key = { it.id }) { entry ->
+            val title = when (entry.type) {
+                "movie" -> entry.movie?.title ?: "Unknown"
+                "episode" -> entry.show?.title ?: "Unknown"
+                else -> entry.movie?.title ?: entry.show?.title ?: "Unknown"
+            }
+            val supporting = buildString {
+                when (entry.type) {
+                    "episode" -> {
+                        val ep = entry.episode
+                        if (ep != null) {
+                            append("S${ep.season}E${ep.number}")
+                            if (!ep.title.isNullOrBlank()) append(" · ${ep.title}")
+                        }
+                    }
+                    "movie" -> {
+                        entry.movie?.year?.let { append(it.toString()) }
+                    }
+                }
+                val watchedDate = entry.watchedAt.take(10)
+                if (isNotEmpty()) append(" · ")
+                append(watchedDate)
+            }
+            ListItem(
+                headlineContent = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                supportingContent = { if (supporting.isNotEmpty()) Text(supporting, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            )
+            HorizontalDivider()
+        }
+        if (isLoadingMore) {
+            item {
+                LoadingIndicator(modifier = Modifier.padding(16.dp))
             }
         }
     }

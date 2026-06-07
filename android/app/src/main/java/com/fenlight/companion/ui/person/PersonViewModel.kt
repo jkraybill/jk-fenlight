@@ -29,9 +29,16 @@ class PersonViewModel(application: Application) : AndroidViewModel(application) 
             try {
                 val excludeAdult = app.prefs.excludeAdult.first()
                 val person = app.tmdbApi.person(personId)
-                val credits = (person.combinedCredits?.cast ?: emptyList())
+                val castCredits = (person.combinedCredits?.cast ?: emptyList())
                     .filter { it.mediaType == "movie" || it.mediaType == "tv" }
                     .filter { !excludeAdult || !it.adult }
+                // Merge cast and crew, preferring cast entries, dedup by id
+                val crewCredits = (person.combinedCredits?.crew ?: emptyList())
+                    .filter { it.mediaType == "movie" || it.mediaType == "tv" }
+                    .filter { !excludeAdult || !it.adult }
+                val castIds = castCredits.map { it.id }.toSet()
+                val combined = castCredits + crewCredits.filter { it.id !in castIds }
+                val credits = combined
                     .distinctBy { it.id }
                     .sortedByDescending { it.popularity }
                 val items = credits.map { c ->
