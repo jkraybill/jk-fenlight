@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -38,15 +39,38 @@ private fun parseRdTitle(filename: String): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RdScreen(vm: RdViewModel = viewModel()) {
+fun RdScreen(
+    onGoToSettings: () -> Unit = {},
+    vm: RdViewModel = viewModel(),
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     val snackbarHostState = rememberPlayMessageSnackbar(state.playMessage) { vm.clearPlayMessage() }
+    val selectedTorrent = state.selectedTorrent
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = { Text(if (selectedTorrent != null) parseRdTitle(selectedTorrent.filename) else "Debrid", maxLines = 1) },
+                navigationIcon = {
+                    if (selectedTorrent != null) {
+                        IconButton(onClick = vm::clearSelectedTorrent) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
+                    }
+                },
+                actions = {
+                    if (selectedTorrent == null) {
+                        IconButton(onClick = onGoToSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        }
+                    }
+                },
+            )
+        },
+    ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             val torrent = state.selectedTorrent
             if (torrent != null) {
-                TorrentFileList(torrent, onBack = vm::clearSelectedTorrent, onPlay = { vm.playTorrentFile(torrent, it) })
+                TorrentFileList(torrent, onPlay = { vm.playTorrentFile(torrent, it) })
                 return@Column
             }
 
@@ -152,7 +176,6 @@ private fun StatusChip(status: String, progress: Int) {
 @Composable
 private fun TorrentFileList(
     torrent: RdTorrentInfo,
-    onBack: () -> Unit,
     onPlay: (com.fenlight.companion.data.model.RdFile) -> Unit,
 ) {
     val videoExtensions = setOf("mkv", "mp4", "avi", "mov", "wmv", "m4v", "ts", "flv")
@@ -161,10 +184,6 @@ private fun TorrentFileList(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = { Text(parseRdTitle(torrent.filename), maxLines = 1) },
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") } },
-        )
         if (files.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("No playable video files", color = MaterialTheme.colorScheme.onSurfaceVariant)

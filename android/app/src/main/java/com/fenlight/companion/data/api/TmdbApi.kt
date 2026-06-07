@@ -151,17 +151,17 @@ interface TmdbV4Api {
     @POST("list/{list_id}/items")
     suspend fun addItemToList(
         @Path("list_id") listId: Int,
-        @Body body: Map<String, Any>,
+        @Body body: @JvmSuppressWildcards Map<String, Any>,
     ): Any
 
     @HTTP(method = "DELETE", path = "list/{list_id}/items", hasBody = true)
     suspend fun removeItemFromList(
         @Path("list_id") listId: Int,
-        @Body body: Map<String, Any>,
+        @Body body: @JvmSuppressWildcards Map<String, Any>,
     ): Any
 
     @POST("list")
-    suspend fun createList(@Body body: Map<String, Any>): TmdbCreateListResponse
+    suspend fun createList(@Body body: @JvmSuppressWildcards Map<String, Any>): TmdbCreateListResponse
 
     @DELETE("list/{list_id}")
     suspend fun deleteList(@Path("list_id") listId: Int): Any

@@ -55,22 +55,22 @@ interface TraktApi {
     ): List<TraktListItem>
 
     @POST("sync/watchlist")
-    suspend fun addToWatchlist(@Body body: Map<String, Any>): Any
+    suspend fun addToWatchlist(@Body body: @JvmSuppressWildcards Map<String, Any>): Any
 
     @POST("sync/watchlist/remove")
-    suspend fun removeFromWatchlist(@Body body: Map<String, Any>): Any
+    suspend fun removeFromWatchlist(@Body body: @JvmSuppressWildcards Map<String, Any>): Any
 
     // Add / remove items from a user's custom list
     @POST("users/me/lists/{slug}/items")
     suspend fun addToListItems(
         @Path("slug") slug: String,
-        @Body body: Map<String, Any>,
+        @Body body: @JvmSuppressWildcards Map<String, Any>,
     ): Any
 
     @POST("users/me/lists/{slug}/items/remove")
     suspend fun removeFromListItems(
         @Path("slug") slug: String,
-        @Body body: Map<String, Any>,
+        @Body body: @JvmSuppressWildcards Map<String, Any>,
     ): Any
 
     @GET("sync/watched/shows")
@@ -80,7 +80,7 @@ interface TraktApi {
     suspend fun showProgress(@Path("id") id: String): TraktShowProgress
 
     @POST("users/me/lists")
-    suspend fun createList(@Body body: Map<String, Any>): TraktList
+    suspend fun createList(@Body body: @JvmSuppressWildcards Map<String, Any>): TraktList
 
     @DELETE("users/me/lists/{slug}")
     suspend fun deleteList(@Path("slug") slug: String): Unit

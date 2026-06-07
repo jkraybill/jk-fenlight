@@ -2,6 +2,7 @@ package com.fenlight.companion.ui.trakt
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -19,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -26,6 +29,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import com.fenlight.companion.FenLightApp
 import com.fenlight.companion.data.model.TraktList
 import com.fenlight.companion.data.model.TraktListItem
 import com.fenlight.companion.data.model.TraktShowProgress
@@ -45,7 +50,12 @@ private fun placeholderColor(title: String): Color {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TraktScreen(vm: TraktViewModel = viewModel()) {
+fun TraktScreen(
+    onMovieClick: (Int) -> Unit = {},
+    onShowClick: (Int) -> Unit = {},
+    onGoToSettings: () -> Unit = {},
+    vm: TraktViewModel = viewModel(),
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     val snackbarHostState = rememberPlayMessageSnackbar(state.playMessage) { vm.clearPlayMessage() }
 
@@ -99,18 +109,35 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
         )
     }
 
+    val drilledIn = state.listItems.isNotEmpty() || state.selectedListName.isNotEmpty()
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            if (state.tab == TraktTab.MY_LISTS && state.listItems.isEmpty() && state.selectedListName.isEmpty()) {
-                FloatingActionButton(onClick = vm::showCreateListDialog) {
-                    Icon(Icons.Default.Add, contentDescription = "Create list")
-                }
-            }
+        topBar = {
+            TopAppBar(
+                title = { Text(if (drilledIn) state.selectedListName else "Trakt") },
+                navigationIcon = {
+                    if (drilledIn) {
+                        IconButton(onClick = vm::clearListItems) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
+                    }
+                },
+                actions = {
+                    if (!drilledIn) {
+                        if (state.tab == TraktTab.MY_LISTS) {
+                            IconButton(onClick = vm::showCreateListDialog) {
+                                Icon(Icons.Default.Add, contentDescription = "Create list")
+                            }
+                        }
+                        IconButton(onClick = onGoToSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        }
+                    }
+                },
+            )
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            if (state.listItems.isNotEmpty() || state.selectedListName.isNotEmpty()) {
+            if (drilledIn) {
                 // Show list items with pagination
                 ListItemsScreen(
                     listName = state.selectedListName,
@@ -123,8 +150,9 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
                     hasMore = state.listItemHasMore,
                     onLoadMore = vm::loadMoreListItems,
                     onRefresh = vm::refresh,
-                    onBack = vm::clearListItems,
                     onPlayMovie = vm::playListMovie,
+                    onMovieClick = onMovieClick,
+                    onShowClick = onShowClick,
                 )
                 return@Column
             }
@@ -155,7 +183,7 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
                 modifier = Modifier.fillMaxSize(),
             ) {
                 when (state.tab) {
-                    TraktTab.CONTINUE_WATCHING -> ContinueWatchingList(state.watchedShows, state.showProgressMap, vm::playNextEpisode)
+                    TraktTab.CONTINUE_WATCHING -> ContinueWatchingList(state.watchedShows, state.showProgressMap, state.continueWatchingPosters, vm::playNextEpisode, onShowClick)
                     TraktTab.MY_LISTS -> TraktListList(
                         lists = state.myLists,
                         onListClick = { list -> vm.loadListItems(list.slug, list.name, "me") },
@@ -168,18 +196,21 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
                             vm.loadListItems(list.slug, list.name, user)
                         },
                     )
-                    TraktTab.WATCHLIST -> WatchlistTab(state.watchlistMovies, state.watchlistShows, vm::playListMovie)
+                    TraktTab.WATCHLIST -> WatchlistTab(state.watchlistMovies, state.watchlistShows, vm::playListMovie, onMovieClick, onShowClick)
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ContinueWatchingList(
     shows: List<TraktWatchedShow>,
     progressMap: Map<String, TraktShowProgress>,
+    posters: Map<Int, String?>,
     onPlay: (TraktWatchedShow) -> Unit,
+    onShowClick: (Int) -> Unit,
 ) {
     if (shows.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -190,6 +221,7 @@ private fun ContinueWatchingList(
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
         items(shows) { watched ->
             val slug = watched.show.ids.slug ?: ""
+            val tmdbId = watched.show.ids.tmdb
             val prog = progressMap[slug]
             val nextEp = prog?.nextEpisode
             val initials = watched.show.title
@@ -197,11 +229,13 @@ private fun ContinueWatchingList(
                 .take(2)
                 .mapNotNull { it.firstOrNull()?.uppercaseChar() }
                 .joinToString("")
+            val posterPath = tmdbId?.let { posters[it] }
             val progressFraction = prog?.let {
                 if (it.aired > 0) (it.completed.toFloat() / it.aired).coerceIn(0f, 1f) else 0f
             } ?: 0f
 
             Card(
+                onClick = { tmdbId?.let(onShowClick) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp),
@@ -220,11 +254,20 @@ private fun ContinueWatchingList(
                             .background(placeholderColor(watched.show.title)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = initials,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.7f),
-                        )
+                        if (posterPath != null) {
+                            AsyncImage(
+                                model = FenLightApp.posterUrl(posterPath, "w185"),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            Text(
+                                text = initials,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.7f),
+                            )
+                        }
                     }
 
                     Column(
@@ -324,6 +367,8 @@ private fun WatchlistTab(
     movies: List<TraktListItem>,
     shows: List<TraktListItem>,
     onPlayMovie: (TraktListItem) -> Unit,
+    onMovieClick: (Int) -> Unit,
+    onShowClick: (Int) -> Unit,
 ) {
     if (movies.isEmpty() && shows.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -353,6 +398,7 @@ private fun WatchlistTab(
                             }
                         }
                     },
+                    modifier = movie.ids.tmdb?.let { id -> Modifier.clickable { onMovieClick(id) } } ?: Modifier,
                 )
                 HorizontalDivider()
             }
@@ -371,6 +417,7 @@ private fun WatchlistTab(
                 ListItem(
                     headlineContent = { Text(show.title) },
                     supportingContent = { show.year?.let { Text(it.toString()) } },
+                    modifier = show.ids.tmdb?.let { id -> Modifier.clickable { onShowClick(id) } } ?: Modifier,
                 )
                 HorizontalDivider()
             }
@@ -391,8 +438,9 @@ private fun ListItemsScreen(
     hasMore: Boolean,
     onLoadMore: () -> Unit,
     onRefresh: () -> Unit,
-    onBack: () -> Unit,
     onPlayMovie: (TraktListItem) -> Unit,
+    onMovieClick: (Int) -> Unit,
+    onShowClick: (Int) -> Unit,
 ) {
     val listState = rememberLazyListState()
     val shouldLoadMore by remember {
@@ -425,12 +473,6 @@ private fun ListItemsScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = { Text(listName) },
-            navigationIcon = {
-                IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
-            },
-        )
         if (isLoading && items.isEmpty()) {
             LoadingIndicator(modifier = Modifier.padding(32.dp))
             return@Column
@@ -455,7 +497,12 @@ private fun ListItemsScreen(
                             }
                         },
                         modifier = Modifier.combinedClickable(
-                            onClick = {},
+                            onClick = {
+                                val tmdb = item.movie?.ids?.tmdb ?: item.show?.ids?.tmdb
+                                if (tmdb != null) {
+                                    if (item.type == "show") onShowClick(tmdb) else onMovieClick(tmdb)
+                                }
+                            },
                             onLongClick = { selectedItem = item },
                         ),
                     )

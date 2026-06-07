@@ -24,6 +24,7 @@ data class TraktUiState(
     val error: String? = null,
     val watchedShows: List<TraktWatchedShow> = emptyList(),
     val showProgressMap: Map<String, TraktShowProgress> = emptyMap(),
+    val continueWatchingPosters: Map<Int, String?> = emptyMap(), // tmdbId -> poster path
     val myLists: List<TraktList> = emptyList(),
     val likedLists: List<TraktList> = emptyList(),
     val listItems: List<TraktListItem> = emptyList(),
@@ -103,8 +104,16 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
                     progressMap[slug]?.nextEpisode != null
                 }
 
+                // Fetch TMDB poster art for each show in parallel (Trakt provides no artwork).
+                val posters = coroutineScope {
+                    filtered.mapNotNull { w ->
+                        val tmdb = w.show.ids.tmdb ?: return@mapNotNull null
+                        async { runCatching { tmdb to app.tmdbApi.tvDetail(tmdb, "").posterPath }.getOrNull() }
+                    }.awaitAll().filterNotNull().toMap()
+                }
+
                 tabFetchedAt[TraktTab.CONTINUE_WATCHING] = System.currentTimeMillis()
-                _state.update { it.copy(isLoading = false, isRefreshing = false, watchedShows = filtered, showProgressMap = progressMap) }
+                _state.update { it.copy(isLoading = false, isRefreshing = false, watchedShows = filtered, showProgressMap = progressMap, continueWatchingPosters = posters) }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.message) }
             }

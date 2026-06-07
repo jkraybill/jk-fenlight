@@ -80,29 +80,38 @@ fun HomeScreen(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
+    // Movies and TV rely on this shared top bar (for search + settings). Every other
+    // destination renders its own top bar / back affordance, so we hide this one to
+    // avoid stacking two app bars (which previously left a large gap at the top).
+    val showHomeBar = currentRoute == "movies" || currentRoute == "tv"
+
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        // Bars handle their own status/navigation-bar insets; don't double-pad content.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            TopAppBar(
-                title = { Text("FenLight+ Companion") },
-                actions = {
-                    // Show search icon when on movies or tv top-level destinations
-                    if (currentRoute == "movies") {
-                        IconButton(onClick = { navController.navigate("movie_search") }) {
-                            Icon(Icons.Default.Search, contentDescription = "Search Movies")
+            if (showHomeBar) {
+                TopAppBar(
+                    title = { Text("FenLight+ Companion") },
+                    actions = {
+                        // Show search icon when on movies or tv top-level destinations
+                        if (currentRoute == "movies") {
+                            IconButton(onClick = { navController.navigate("movie_search") }) {
+                                Icon(Icons.Default.Search, contentDescription = "Search Movies")
+                            }
                         }
-                    }
-                    if (currentRoute == "tv") {
-                        IconButton(onClick = { navController.navigate("tv_search") }) {
-                            Icon(Icons.Default.Search, contentDescription = "Search TV")
+                        if (currentRoute == "tv") {
+                            IconButton(onClick = { navController.navigate("tv_search") }) {
+                                Icon(Icons.Default.Search, contentDescription = "Search TV")
+                            }
                         }
-                    }
-                    IconButton(onClick = onGoToSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
+                        IconButton(onClick = onGoToSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        }
+                    },
+                    scrollBehavior = scrollBehavior,
+                )
+            }
         },
         bottomBar = {
             NavigationBar {
@@ -211,6 +220,7 @@ fun HomeScreen(
                 TmdbListsScreen(
                     onMovieClick = { id -> navController.navigate("movie_detail/$id") },
                     onShowClick = { id -> navController.navigate("tv_detail/$id") },
+                    onGoToSettings = onGoToSettings,
                 )
             }
             composable("related/{mediaType}/{id}/{kind}") { back ->
@@ -239,8 +249,14 @@ fun HomeScreen(
                     },
                 )
             }
-            composable("trakt") { TraktScreen() }
-            composable("rd") { RdScreen() }
+            composable("trakt") {
+                TraktScreen(
+                    onMovieClick = { id -> navController.navigate("movie_detail/$id") },
+                    onShowClick = { id -> navController.navigate("tv_detail/$id") },
+                    onGoToSettings = onGoToSettings,
+                )
+            }
+            composable("rd") { RdScreen(onGoToSettings = onGoToSettings) }
         }
     }
 }
