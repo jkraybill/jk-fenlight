@@ -125,6 +125,7 @@ data class PersonCredit(
     val popularity: Double = 0.0,
     val character: String? = null,
     val adult: Boolean = false,
+    val job: String? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -210,4 +211,10 @@ data class TmdbCreateListResponse(
     val id: Int,
     val success: Boolean,
     @Json(name = "status_message") val statusMessage: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class TmdbAccountInfo(
+    val username: String? = null,
+    val name: String? = null,
 )
