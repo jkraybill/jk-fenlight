@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.fenlight.companion.FenLightApp
 import com.fenlight.companion.ui.components.PaginatedItem
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -21,10 +23,17 @@ class MovieSearchViewModel(application: Application) : AndroidViewModel(applicat
     private val app = application as FenLightApp
     private val _state = MutableStateFlow(MovieSearchUiState())
     val state: StateFlow<MovieSearchUiState> = _state.asStateFlow()
+    private var searchJob: Job? = null
 
     fun onQueryChange(q: String) {
         _state.update { MovieSearchUiState(query = q) }
-        if (q.length >= 2) loadNextPage()
+        searchJob?.cancel()
+        if (q.length >= 2) {
+            searchJob = viewModelScope.launch {
+                delay(1000L)
+                loadNextPage()
+            }
+        }
     }
 
     fun loadNextPage() {
