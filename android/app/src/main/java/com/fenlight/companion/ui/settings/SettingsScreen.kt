@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fenlight.companion.R
-import com.fenlight.companion.ui.movies.DropdownField
+import com.fenlight.companion.ui.components.DropdownField
 import com.fenlight.companion.ui.setup.SetupViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
