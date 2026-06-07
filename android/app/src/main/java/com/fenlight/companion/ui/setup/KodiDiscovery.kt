@@ -34,7 +34,9 @@ object KodiDiscovery {
                 val host = "$base.$n"
                 if (host == localIp) return@async
                 if (isPortOpen(host, 8080) && pingKodi(host, 8080)) {
-                    onFound(DiscoveredKodi(host, 8080, "Kodi @ $host"))
+                    val deviceName = fetchDeviceName(host, 8080)
+                    val label = deviceName?.takeIf { it.isNotBlank() } ?: "Kodi @ $host"
+                    onFound(DiscoveredKodi(host, 8080, label))
                 }
             }
         }.awaitAll()
@@ -56,6 +58,21 @@ object KodiDiscovery {
         resp.isSuccessful && JSONObject(resp.body?.string() ?: "{}").optString("result") == "pong"
     } catch (_: Exception) {
         false
+    }
+
+    /** The friendly name configured in Kodi → Settings → Services → Device name. */
+    private fun fetchDeviceName(host: String, port: Int): String? = try {
+        val body = """{"jsonrpc":"2.0","method":"Settings.GetSettingValue","params":{"setting":"services.devicename"},"id":1}"""
+        val req = Request.Builder()
+            .url("http://$host:$port/jsonrpc")
+            .post(body.toRequestBody(jsonType))
+            .build()
+        val resp = scanClient.newCall(req).execute()
+        if (!resp.isSuccessful) null
+        else JSONObject(resp.body?.string() ?: "{}")
+            .optJSONObject("result")?.optString("value")?.takeIf { it.isNotBlank() }
+    } catch (_: Exception) {
+        null
     }
 
     private fun localIpv4(): String? = try {
