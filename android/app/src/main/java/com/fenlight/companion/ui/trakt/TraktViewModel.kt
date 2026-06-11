@@ -10,6 +10,7 @@ import com.fenlight.companion.data.model.TraktList
 import com.fenlight.companion.data.model.TraktListItem
 import com.fenlight.companion.data.model.TraktShowProgress
 import com.fenlight.companion.data.model.TraktWatchedShow
+import com.fenlight.companion.ui.components.PaginatedItem
 import com.fenlight.companion.util.Pagination
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -30,6 +31,8 @@ data class TraktUiState(
     val myLists: List<TraktList> = emptyList(),
     val likedLists: List<TraktList> = emptyList(),
     val listItems: List<TraktListItem> = emptyList(),
+    val listItemsEnriched: List<PaginatedItem> = emptyList(),
+    val listItemTypeMap: Map<Int, String> = emptyMap(),
     val listItemPage: Int = 0,
     val listItemHasMore: Boolean = false,
     val listItemIsLoadingMore: Boolean = false,
@@ -251,6 +254,8 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
                 selectedListSlug = slug,
                 selectedListUser = user,
                 listItems = emptyList(),
+                listItemsEnriched = emptyList(),
+                listItemTypeMap = emptyMap(),
                 listItemPage = 0,
                 listItemHasMore = false,
             )
@@ -276,12 +281,47 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val newItems = response.body() ?: emptyList()
                 val pagesHeader = response.headers()[Pagination.TRAKT_PAGE_COUNT_HEADER]
+
+                val enrichedPairs = coroutineScope {
+                    newItems.map { item ->
+                        async {
+                            val tmdbId = item.movie?.ids?.tmdb ?: item.show?.ids?.tmdb
+                                ?: return@async null
+                            runCatching {
+                                if (item.type == "movie") {
+                                    val d = app.tmdbApi.movieDetail(tmdbId, "")
+                                    PaginatedItem(
+                                        id = d.id,
+                                        title = d.title,
+                                        posterUrl = FenLightApp.posterUrl(d.posterPath),
+                                        rating = d.voteAverage.takeIf { it > 0 },
+                                        backdropUrl = FenLightApp.backdropUrl(d.backdropPath),
+                                    )
+                                } else {
+                                    val d = app.tmdbApi.tvDetail(tmdbId, "")
+                                    PaginatedItem(
+                                        id = d.id,
+                                        title = d.name,
+                                        posterUrl = FenLightApp.posterUrl(d.posterPath),
+                                        rating = d.voteAverage.takeIf { it > 0 },
+                                        backdropUrl = FenLightApp.backdropUrl(d.backdropPath),
+                                    )
+                                } to item.type
+                            }.getOrNull()
+                        }
+                    }.awaitAll().filterNotNull()
+                }
+                val enrichedItems = enrichedPairs.map { it.first }
+                val typeMap = enrichedPairs.associate { (item, type) -> item.id to type }
+
                 _state.update {
                     it.copy(
                         isLoading = false,
                         isRefreshing = false,
                         listItemIsLoadingMore = false,
                         listItems = if (append) it.listItems + newItems else newItems,
+                        listItemsEnriched = if (append) it.listItemsEnriched + enrichedItems else enrichedItems,
+                        listItemTypeMap = if (append) it.listItemTypeMap + typeMap else typeMap,
                         listItemPage = page,
                         listItemHasMore = Pagination.hasMoreByTraktHeader(pagesHeader, page),
                     )
@@ -293,7 +333,15 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearListItems() = _state.update {
-        it.copy(listItems = emptyList(), selectedListName = "", selectedListSlug = "", listItemPage = 0, listItemHasMore = false)
+        it.copy(
+            listItems = emptyList(),
+            listItemsEnriched = emptyList(),
+            listItemTypeMap = emptyMap(),
+            selectedListName = "",
+            selectedListSlug = "",
+            listItemPage = 0,
+            listItemHasMore = false,
+        )
     }
 
     fun playNextEpisode(watched: TraktWatchedShow) {

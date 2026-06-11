@@ -60,6 +60,26 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
 
+            // ── Appearance ────────────────────────────────────────────────────
+            SettingsSection(title = "Appearance") {
+                Text(
+                    "Choose how the app looks.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                val themeModes = listOf("system" to "System", "light" to "Light", "dark" to "Dark")
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    themeModes.forEachIndexed { index, (value, label) ->
+                        SegmentedButton(
+                            selected = state.themeMode == value,
+                            onClick = { vm.setThemeMode(value) },
+                            shape = SegmentedButtonDefaults.itemShape(index, themeModes.size),
+                            label = { Text(label) },
+                        )
+                    }
+                }
+            }
+
             // ── About ─────────────────────────────────────────────────────────
             SettingsSection(title = "About") {
                 Row(

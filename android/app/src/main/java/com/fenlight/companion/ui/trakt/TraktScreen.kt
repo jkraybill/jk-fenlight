@@ -39,6 +39,8 @@ import com.fenlight.companion.data.model.TraktWatchedShow
 import com.fenlight.companion.ui.components.ErrorMessage
 import com.fenlight.companion.ui.components.ListManagementSheet
 import com.fenlight.companion.ui.components.LoadingIndicator
+import com.fenlight.companion.ui.components.PaginatedGrid
+import com.fenlight.companion.ui.components.PaginatedItem
 import com.fenlight.companion.ui.components.rememberPlayMessageSnackbar
 
 private fun placeholderColor(title: String): Color {
@@ -145,14 +147,14 @@ fun TraktScreen(
                     listName = state.selectedListName,
                     listSlug = state.selectedListSlug,
                     isMine = state.selectedListUser == "me",
-                    items = state.listItems,
+                    enrichedItems = state.listItemsEnriched,
+                    typeMap = state.listItemTypeMap,
                     isLoading = state.isLoading,
                     isRefreshing = state.isRefreshing,
                     isLoadingMore = state.listItemIsLoadingMore,
                     hasMore = state.listItemHasMore,
                     onLoadMore = vm::loadMoreListItems,
                     onRefresh = vm::refresh,
-                    onPlayMovie = vm::playListMovie,
                     onMovieClick = onMovieClick,
                     onShowClick = onShowClick,
                 )
@@ -437,55 +439,40 @@ private fun WatchlistTab(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ListItemsScreen(
     listName: String,
     listSlug: String,
     isMine: Boolean,
-    items: List<TraktListItem>,
+    enrichedItems: List<PaginatedItem>,
+    typeMap: Map<Int, String>,
     isLoading: Boolean,
     isRefreshing: Boolean,
     isLoadingMore: Boolean,
     hasMore: Boolean,
     onLoadMore: () -> Unit,
     onRefresh: () -> Unit,
-    onPlayMovie: (TraktListItem) -> Unit,
     onMovieClick: (Int) -> Unit,
     onShowClick: (Int) -> Unit,
 ) {
-    val listState = rememberLazyListState()
-    val shouldLoadMore by remember {
-        derivedStateOf {
-            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            last >= items.size - 5 && !isLoadingMore && hasMore
-        }
-    }
-    LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) onLoadMore() }
-
-    var selectedItem by remember { mutableStateOf<TraktListItem?>(null) }
+    var selectedItem by remember { mutableStateOf<PaginatedItem?>(null) }
 
     selectedItem?.let { item ->
-        val tmdbId = item.movie?.ids?.tmdb ?: item.show?.ids?.tmdb
-        val mediaType = if (item.type == "show") "show" else "movie"
-        val title = item.movie?.title ?: item.show?.title ?: ""
-        if (tmdbId != null) {
-            ListManagementSheet(
-                mediaId = tmdbId,
-                mediaType = mediaType,
-                title = title,
-                posterUrl = null,
-                currentTraktListSlug = if (isMine) listSlug else null,
-                currentTraktListName = if (isMine) listName else null,
-                onDismiss = { selectedItem = null },
-            )
-        } else {
-            selectedItem = null
-        }
+        val mediaType = typeMap[item.id] ?: "movie"
+        ListManagementSheet(
+            mediaId = item.id,
+            mediaType = mediaType,
+            title = item.title,
+            posterUrl = item.posterUrl,
+            currentTraktListSlug = if (isMine) listSlug else null,
+            currentTraktListName = if (isMine) listName else null,
+            onDismiss = { selectedItem = null },
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        if (isLoading && items.isEmpty()) {
+        if (isLoading && enrichedItems.isEmpty()) {
             LoadingIndicator(modifier = Modifier.padding(32.dp))
             return@Column
         }
@@ -494,38 +481,17 @@ private fun ListItemsScreen(
             onRefresh = onRefresh,
             modifier = Modifier.fillMaxSize(),
         ) {
-            LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
-                items(items) { item ->
-                    val title = item.movie?.title ?: item.show?.title ?: "Unknown"
-                    val year = (item.movie?.year ?: item.show?.year)?.toString() ?: ""
-                    ListItem(
-                        headlineContent = { Text(title) },
-                        supportingContent = { Text(year + if (item.type.isNotBlank()) " · ${item.type}" else "") },
-                        trailingContent = {
-                            if (item.type == "movie" && item.movie?.ids?.tmdb != null) {
-                                IconButton(onClick = { onPlayMovie(item) }) {
-                                    Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = MaterialTheme.colorScheme.primary)
-                                }
-                            }
-                        },
-                        modifier = Modifier.combinedClickable(
-                            onClick = {
-                                val tmdb = item.movie?.ids?.tmdb ?: item.show?.ids?.tmdb
-                                if (tmdb != null) {
-                                    if (item.type == "show") onShowClick(tmdb) else onMovieClick(tmdb)
-                                }
-                            },
-                            onLongClick = { selectedItem = item },
-                        ),
-                    )
-                    HorizontalDivider()
-                }
-                if (isLoadingMore) {
-                    item {
-                        LoadingIndicator(modifier = Modifier.padding(16.dp))
-                    }
-                }
-            }
+            PaginatedGrid(
+                items = enrichedItems,
+                isLoading = isLoadingMore,
+                hasMore = hasMore,
+                onLoadMore = onLoadMore,
+                onItemClick = { item ->
+                    if (typeMap[item.id] == "show") onShowClick(item.id) else onMovieClick(item.id)
+                },
+                onItemLongClick = { selectedItem = it },
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }

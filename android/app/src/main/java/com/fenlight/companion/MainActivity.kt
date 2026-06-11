@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,7 +32,14 @@ class MainActivity : ComponentActivity() {
         val prefs = (application as FenLightApp).prefs
 
         setContent {
-            FenLightTheme {
+            val themeMode by prefs.themeMode.collectAsStateWithLifecycle(initialValue = "system")
+            val systemDark = isSystemInDarkTheme()
+            val darkTheme = when (themeMode) {
+                "dark" -> true
+                "light" -> false
+                else -> systemDark
+            }
+            FenLightTheme(darkTheme = darkTheme) {
                 val kodiHost by prefs.kodiHost.collectAsStateWithLifecycle(initialValue = "")
                 val traktToken by prefs.traktAccessToken.collectAsStateWithLifecycle(initialValue = "")
                 val rdToken by prefs.rdAccessToken.collectAsStateWithLifecycle(initialValue = "")

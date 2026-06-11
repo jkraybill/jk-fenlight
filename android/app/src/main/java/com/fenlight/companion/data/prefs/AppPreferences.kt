@@ -41,6 +41,8 @@ class AppPreferences(private val context: Context) {
         private val TMDB_USERNAME = stringPreferencesKey("tmdb_username")
         private val TRAKT_USERNAME = stringPreferencesKey("trakt_username")
         private val RD_USERNAME = stringPreferencesKey("rd_username")
+
+        private val THEME_MODE = stringPreferencesKey("theme_mode")
     }
 
     val kodiHost: Flow<String> = context.dataStore.data.map { it[KODI_HOST] ?: "" }
@@ -72,6 +74,8 @@ class AppPreferences(private val context: Context) {
     val tmdbUsername: Flow<String> = context.dataStore.data.map { it[TMDB_USERNAME] ?: "" }
     val traktUsername: Flow<String> = context.dataStore.data.map { it[TRAKT_USERNAME] ?: "" }
     val rdUsername: Flow<String> = context.dataStore.data.map { it[RD_USERNAME] ?: "" }
+
+    val themeMode: Flow<String> = context.dataStore.data.map { it[THEME_MODE] ?: "system" }
 
     suspend fun setCheckUpdateOnStartup(enabled: Boolean) {
         context.dataStore.edit { it[CHECK_UPDATE_ON_STARTUP] = enabled }
@@ -170,6 +174,10 @@ class AppPreferences(private val context: Context) {
 
     suspend fun saveRdUsername(username: String) {
         context.dataStore.edit { if (username.isBlank()) it.remove(RD_USERNAME) else it[RD_USERNAME] = username }
+    }
+
+    suspend fun setThemeMode(mode: String) {
+        context.dataStore.edit { it[THEME_MODE] = mode }
     }
 
     suspend fun saveMovieBrowseRows(json: String) {
