@@ -8,6 +8,7 @@ import com.fenlight.companion.data.api.KodiRpc
 import com.fenlight.companion.data.model.TmdbList
 import com.fenlight.companion.data.model.TmdbListItem
 import com.fenlight.companion.ui.components.PaginatedItem
+import com.fenlight.companion.util.Pagination
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -104,7 +105,7 @@ class TmdbListsViewModel(application: Application) : AndroidViewModel(applicatio
                         listItemIsLoadingMore = false,
                         listItems = if (append) it.listItems + detail.results else detail.results,
                         listItemPage = page,
-                        listItemHasMore = page < detail.totalPages,
+                        listItemHasMore = Pagination.hasMoreByPageCount(page, detail.totalPages),
                     )
                 }
             } catch (e: Exception) {

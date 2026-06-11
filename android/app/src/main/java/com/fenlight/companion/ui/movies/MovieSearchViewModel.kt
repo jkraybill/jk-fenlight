@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.fenlight.companion.FenLightApp
 import com.fenlight.companion.ui.components.PaginatedItem
+import com.fenlight.companion.util.Pagination
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -61,7 +62,7 @@ class MovieSearchViewModel(application: Application) : AndroidViewModel(applicat
                         isLoading = false,
                         items = (it.items + newItems).distinctBy { i -> i.id },
                         page = nextPage,
-                        hasMore = nextPage < result.totalPages,
+                        hasMore = Pagination.hasMoreByPageCount(nextPage, result.totalPages),
                     )
                 }
             } catch (e: Exception) {

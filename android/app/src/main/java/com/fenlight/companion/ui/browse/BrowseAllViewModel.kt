@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.fenlight.companion.FenLightApp
 import com.fenlight.companion.data.model.*
 import com.fenlight.companion.ui.components.PaginatedItem
+import com.fenlight.companion.util.Pagination
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.*
@@ -72,7 +73,7 @@ class BrowseAllViewModel(application: Application) : AndroidViewModel(applicatio
                                 isLoading = false,
                                 items = (it.items + newItems).distinctBy { i -> i.id },
                                 page = nextPage,
-                                hasMore = nextPage < detail.totalPages,
+                                hasMore = Pagination.hasMoreByPageCount(nextPage, detail.totalPages),
                             )
                         }
                     }
@@ -120,23 +121,23 @@ class BrowseAllViewModel(application: Application) : AndroidViewModel(applicatio
                                 }.awaitAll().filterNotNull()
                             }
                         }
-                        val totalPages = response.headers()["X-Pagination-Page-Count"]?.toIntOrNull()
-                            ?: if (body.size >= 50) nextPage + 1 else nextPage
                         _state.update {
                             it.copy(
                                 isLoading = false,
                                 items = (it.items + newItems).distinctBy { i -> i.id },
                                 page = nextPage,
-                                hasMore = nextPage < totalPages,
+                                hasMore = Pagination.hasMoreByTraktHeader(
+                                    response.headers()[Pagination.TRAKT_PAGE_COUNT_HEADER], nextPage,
+                                ),
                             )
                         }
                     }
                     RowType.TRENDING -> {
                         val countries = region?.lowercase()
-                        val (newItems, totalPages) = if (mediaType == "tv") {
+                        val (newItems, pagesHeader) = if (mediaType == "tv") {
                             val response = app.traktApi.showsTrending(nextPage, countries = countries)
                             val body = response.body() ?: emptyList()
-                            val pages = response.headers()["X-Pagination-Page-Count"]?.toIntOrNull() ?: nextPage
+                            val pages = response.headers()[Pagination.TRAKT_PAGE_COUNT_HEADER]
                             val items = supervisorScope {
                                 body.filter { it.show.ids.tmdb != null }.map { trending ->
                                     async {
@@ -157,7 +158,7 @@ class BrowseAllViewModel(application: Application) : AndroidViewModel(applicatio
                         } else {
                             val response = app.traktApi.moviesTrending(nextPage, countries = countries)
                             val body = response.body() ?: emptyList()
-                            val pages = response.headers()["X-Pagination-Page-Count"]?.toIntOrNull() ?: nextPage
+                            val pages = response.headers()[Pagination.TRAKT_PAGE_COUNT_HEADER]
                             val items = supervisorScope {
                                 body.filter { it.movie.ids.tmdb != null }.map { trending ->
                                     async {
@@ -182,7 +183,7 @@ class BrowseAllViewModel(application: Application) : AndroidViewModel(applicatio
                                 isLoading = false,
                                 items = (it.items + newItems).distinctBy { i -> i.id },
                                 page = nextPage,
-                                hasMore = nextPage < totalPages,
+                                hasMore = Pagination.hasMoreByTraktHeader(pagesHeader, nextPage),
                             )
                         }
                     }
@@ -202,7 +203,7 @@ class BrowseAllViewModel(application: Application) : AndroidViewModel(applicatio
                                     isLoading = false,
                                     items = (it.items + newItems).distinctBy { i -> i.id },
                                     page = nextPage,
-                                    hasMore = nextPage < result.totalPages,
+                                    hasMore = Pagination.hasMoreByPageCount(nextPage, result.totalPages),
                                 )
                             }
                         } else {
@@ -222,7 +223,7 @@ class BrowseAllViewModel(application: Application) : AndroidViewModel(applicatio
                                     isLoading = false,
                                     items = (it.items + newItems).distinctBy { i -> i.id },
                                     page = nextPage,
-                                    hasMore = nextPage < result.totalPages,
+                                    hasMore = Pagination.hasMoreByPageCount(nextPage, result.totalPages),
                                 )
                             }
                         }

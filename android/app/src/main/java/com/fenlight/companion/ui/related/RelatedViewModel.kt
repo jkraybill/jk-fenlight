@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.fenlight.companion.FenLightApp
 import com.fenlight.companion.ui.components.PaginatedItem
+import com.fenlight.companion.util.Pagination
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -83,7 +84,7 @@ class RelatedViewModel(application: Application) : AndroidViewModel(application)
                         isLoading = false,
                         items = (it.items + newItems).distinctBy { item -> item.id },
                         page = nextPage,
-                        hasMore = nextPage < totalPages,
+                        hasMore = Pagination.hasMoreByPageCount(nextPage, totalPages),
                     )
                 }
             } catch (e: Exception) {
