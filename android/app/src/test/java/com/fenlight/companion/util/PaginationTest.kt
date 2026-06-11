@@ -23,4 +23,24 @@ class PaginationTest {
         assertFalse(Pagination.hasMoreByPageCount(currentPage = 7, totalPages = 7))
         assertFalse(Pagination.hasMoreByPageCount(currentPage = 8, totalPages = 7))
     }
+
+    @Test
+    fun traktHeader_morePages() {
+        assertTrue(Pagination.hasMoreByTraktHeader(pageCountHeader = "7", currentPage = 1))
+    }
+
+    @Test
+    fun traktHeader_onLastPage() {
+        assertFalse(Pagination.hasMoreByTraktHeader(pageCountHeader = "7", currentPage = 7))
+    }
+
+    @Test
+    fun traktHeader_missing_treatedAsLastPage() {
+        assertFalse(Pagination.hasMoreByTraktHeader(pageCountHeader = null, currentPage = 1))
+    }
+
+    @Test
+    fun traktHeader_unparsable_treatedAsLastPage() {
+        assertFalse(Pagination.hasMoreByTraktHeader(pageCountHeader = "abc", currentPage = 1))
+    }
 }

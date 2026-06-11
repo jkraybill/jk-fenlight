@@ -12,9 +12,6 @@ interface TmdbApi {
     @GET("movie/popular")
     suspend fun popularMovies(@Query("page") page: Int = 1, @Query("region") region: String? = null): PagedResult<Movie>
 
-    @GET("trending/movie/day")
-    suspend fun trendingMovies(@Query("page") page: Int = 1, @Query("region") region: String? = null): PagedResult<Movie>
-
     @GET("movie/now_playing")
     suspend fun nowPlayingMovies(@Query("page") page: Int = 1, @Query("region") region: String? = null): PagedResult<Movie>
 
@@ -55,9 +52,6 @@ interface TmdbApi {
     @GET("tv/popular")
     suspend fun popularTv(@Query("page") page: Int = 1, @Query("region") region: String? = null): PagedResult<TvShow>
 
-    @GET("trending/tv/day")
-    suspend fun trendingTv(@Query("page") page: Int = 1, @Query("region") region: String? = null): PagedResult<TvShow>
-
     @GET("tv/on_the_air")
     suspend fun onTheAirTv(@Query("page") page: Int = 1, @Query("region") region: String? = null): PagedResult<TvShow>
 
@@ -93,6 +87,13 @@ interface TmdbApi {
     @GET("tv/{id}/season/{season}")
     suspend fun seasonDetail(@Path("id") id: Int, @Path("season") season: Int): Season
 
+    @GET("tv/{id}/season/{season}/episode/{episode}")
+    suspend fun episodeDetail(
+        @Path("id") showId: Int,
+        @Path("season") season: Int,
+        @Path("episode") episode: Int,
+    ): Episode
+
     // --- People ---
 
     @GET("person/{id}")
@@ -120,11 +121,6 @@ interface TmdbApi {
 
     @GET("genre/tv/list")
     suspend fun tvGenres(): TmdbGenreList
-
-    // --- Auth (v3 request token, still needed for some flows) ---
-
-    @GET("authentication/token/new")
-    suspend fun requestToken(): TmdbRequestToken
 }
 
 // TMDB v4 API — uses Bearer token (user's access token for personal lists)
@@ -135,9 +131,6 @@ interface TmdbV4Api {
 
     @POST("auth/access_token")
     suspend fun createAccessToken(@Body body: Map<String, String>): TmdbAccessToken
-
-    @DELETE("auth/access_token")
-    suspend fun deleteAccessToken(@Body body: Map<String, String>): Any
 
     @GET("account/{account_id}/lists")
     suspend fun accountLists(

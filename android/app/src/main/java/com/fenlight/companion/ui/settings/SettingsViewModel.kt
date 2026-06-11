@@ -16,6 +16,8 @@ import com.fenlight.companion.FenLightApp
 import com.fenlight.companion.data.update.UpdateChecker
 import com.fenlight.companion.data.update.UpdateInfo
 import com.fenlight.companion.data.update.UpdateResult
+import com.fenlight.companion.util.sha256Hex
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -91,11 +93,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun downloadUpdate(apkUrl: String) {
+    fun downloadUpdate(info: UpdateInfo) {
         val context = getApplication<Application>()
         val destFile = File(context.getExternalFilesDir(null), "FenLightCompanion-update.apk")
         val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        val request = DownloadManager.Request(Uri.parse(apkUrl))
+        val request = DownloadManager.Request(Uri.parse(info.apkUrl))
             .setTitle("FenLight+ Companion update")
             .setDescription("Downloading…")
             .setMimeType("application/vnd.android.package-archive")
@@ -109,18 +111,29 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
                 if (id != downloadId) return
                 context.unregisterReceiver(this)
-                _state.update { it.copy(update = it.update.copy(downloading = false)) }
-                val uri = FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    destFile,
-                )
-                context.startActivity(
-                    Intent(Intent.ACTION_VIEW)
-                        .setDataAndType(uri, "application/vnd.android.package-archive")
-                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                )
+                viewModelScope.launch(Dispatchers.IO) {
+                    val expected = info.sha256?.trim()?.lowercase()
+                    if (expected != null && sha256Of(destFile) != expected) {
+                        destFile.delete()
+                        // Reset to error-only state so the screen shows the failure, not the update offer
+                        _state.update {
+                            it.copy(update = UpdateUiState(error = "Update failed integrity check — download discarded"))
+                        }
+                        return@launch
+                    }
+                    _state.update { it.copy(update = it.update.copy(downloading = false)) }
+                    val uri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        destFile,
+                    )
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW)
+                            .setDataAndType(uri, "application/vnd.android.package-archive")
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                }
             }
         }
         @Suppress("UnspecifiedRegisterReceiverFlag")
@@ -134,4 +147,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             context.registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
         }
     }
+
+    private fun sha256Of(file: File): String = sha256Hex(file.inputStream())
 }

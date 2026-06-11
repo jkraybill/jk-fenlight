@@ -28,18 +28,22 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            storeFile = file(props["KEYSTORE_FILE"] as String)
-            storePassword = props["KEYSTORE_PASSWORD"] as String
-            keyAlias = "fenlight"
-            keyPassword = props["KEY_PASSWORD"] as String
+        // Only configured when local.properties provides a keystore (absent on CI).
+        (props["KEYSTORE_FILE"] as String?)?.let { keystorePath ->
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = props["KEYSTORE_PASSWORD"] as String
+                keyAlias = "fenlight"
+                keyPassword = props["KEY_PASSWORD"] as String
+            }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -91,4 +95,6 @@ dependencies {
     testImplementation(libs.retrofit)
     testImplementation(libs.retrofit.converter.moshi)
     testImplementation(libs.moshi.kotlin)
+    // Android's org.json is a stub in local unit tests; KodiDiscovery parses with JSONObject
+    testImplementation(libs.org.json)
 }
