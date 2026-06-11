@@ -35,11 +35,18 @@ sealed class UpdateResult {
     data class Error(val message: String) : UpdateResult()
 }
 
-class UpdateChecker {
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .build()
+class UpdateChecker(
+    private val versionUrl: String = DEFAULT_VERSION_URL,
+    private val client: OkHttpClient = defaultClient(),
+) {
+    companion object {
+        const val DEFAULT_VERSION_URL = "https://thejason40.github.io/apk/version.json"
+
+        private fun defaultClient() = OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .build()
+    }
 
     private val moshi: Moshi = Moshi.Builder()
         .addLast(KotlinJsonAdapterFactory())
@@ -49,7 +56,7 @@ class UpdateChecker {
         try {
             val response = client.newCall(
                 Request.Builder()
-                    .url("https://thejason40.github.io/apk/version.json")
+                    .url(versionUrl)
                     .build()
             ).execute()
             if (!response.isSuccessful) return@withContext UpdateResult.Error("HTTP ${response.code}")

@@ -16,6 +16,7 @@ import com.fenlight.companion.FenLightApp
 import com.fenlight.companion.data.update.UpdateChecker
 import com.fenlight.companion.data.update.UpdateInfo
 import com.fenlight.companion.data.update.UpdateResult
+import com.fenlight.companion.util.sha256Hex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,7 +24,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
-import java.security.MessageDigest
 
 data class UpdateUiState(
     val checking: Boolean = false,
@@ -148,16 +148,5 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private fun sha256Of(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buf = ByteArray(64 * 1024)
-            while (true) {
-                val read = input.read(buf)
-                if (read < 0) break
-                digest.update(buf, 0, read)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
-    }
+    private fun sha256Of(file: File): String = sha256Hex(file.inputStream())
 }
