@@ -2,6 +2,7 @@ package com.fenlight.companion.ui.trakt
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -19,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -26,6 +29,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import com.fenlight.companion.FenLightApp
 import com.fenlight.companion.data.model.TraktHistoryEntry
 import com.fenlight.companion.data.model.TraktList
 import com.fenlight.companion.data.model.TraktListItem
@@ -34,6 +39,8 @@ import com.fenlight.companion.data.model.TraktWatchedShow
 import com.fenlight.companion.ui.components.ErrorMessage
 import com.fenlight.companion.ui.components.ListManagementSheet
 import com.fenlight.companion.ui.components.LoadingIndicator
+import com.fenlight.companion.ui.components.PaginatedGrid
+import com.fenlight.companion.ui.components.PaginatedItem
 import com.fenlight.companion.ui.components.rememberPlayMessageSnackbar
 
 private fun placeholderColor(title: String): Color {
@@ -46,7 +53,13 @@ private fun placeholderColor(title: String): Color {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TraktScreen(vm: TraktViewModel = viewModel()) {
+fun TraktScreen(
+    onMovieClick: (Int) -> Unit = {},
+    onShowClick: (Int) -> Unit = {},
+    onEpisodeClick: (showId: Int, season: Int, episode: Int) -> Unit = { _, _, _ -> },
+    onGoToSettings: () -> Unit = {},
+    vm: TraktViewModel = viewModel(),
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     val snackbarHostState = rememberPlayMessageSnackbar(state.playMessage) { vm.clearPlayMessage() }
 
@@ -100,32 +113,50 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
         )
     }
 
+    val drilledIn = state.listItems.isNotEmpty() || state.selectedListName.isNotEmpty()
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            if (state.tab == TraktTab.MY_LISTS && state.listItems.isEmpty() && state.selectedListName.isEmpty()) {
-                FloatingActionButton(onClick = vm::showCreateListDialog) {
-                    Icon(Icons.Default.Add, contentDescription = "Create list")
-                }
-            }
+        topBar = {
+            TopAppBar(
+                title = { Text(if (drilledIn) state.selectedListName else "Trakt") },
+                navigationIcon = {
+                    if (drilledIn) {
+                        IconButton(onClick = vm::clearListItems) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
+                    }
+                },
+                actions = {
+                    if (!drilledIn) {
+                        if (state.tab == TraktTab.MY_LISTS) {
+                            IconButton(onClick = vm::showCreateListDialog) {
+                                Icon(Icons.Default.Add, contentDescription = "Create list")
+                            }
+                        }
+                        IconButton(onClick = onGoToSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        }
+                    }
+                },
+            )
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            if (state.listItems.isNotEmpty() || state.selectedListName.isNotEmpty()) {
+            if (drilledIn) {
                 // Show list items with pagination
                 ListItemsScreen(
                     listName = state.selectedListName,
                     listSlug = state.selectedListSlug,
                     isMine = state.selectedListUser == "me",
-                    items = state.listItems,
+                    enrichedItems = state.listItemsEnriched,
+                    typeMap = state.listItemTypeMap,
                     isLoading = state.isLoading,
                     isRefreshing = state.isRefreshing,
                     isLoadingMore = state.listItemIsLoadingMore,
                     hasMore = state.listItemHasMore,
                     onLoadMore = vm::loadMoreListItems,
                     onRefresh = vm::refresh,
-                    onBack = vm::clearListItems,
-                    onPlayMovie = vm::playListMovie,
+                    onMovieClick = onMovieClick,
+                    onShowClick = onShowClick,
                 )
                 return@Column
             }
@@ -156,7 +187,7 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
                 modifier = Modifier.fillMaxSize(),
             ) {
                 when (state.tab) {
-                    TraktTab.CONTINUE_WATCHING -> ContinueWatchingList(state.watchedShows, state.showProgressMap, vm::playNextEpisode)
+                    TraktTab.CONTINUE_WATCHING -> ContinueWatchingList(state.watchedShows, state.showProgressMap, state.continueWatchingPosters, vm::playNextEpisode, onShowClick)
                     TraktTab.MY_LISTS -> TraktListList(
                         lists = state.myLists,
                         onListClick = { list -> vm.loadListItems(list.slug, list.name, "me") },
@@ -169,12 +200,16 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
                             vm.loadListItems(list.slug, list.name, user)
                         },
                     )
-                    TraktTab.WATCHLIST -> WatchlistTab(state.watchlistMovies, state.watchlistShows, vm::playListMovie)
+                    TraktTab.WATCHLIST -> WatchlistTab(state.watchlistMovies, state.watchlistShows, vm::playListMovie, onMovieClick, onShowClick)
                     TraktTab.RECENT -> RecentTab(
                         history = state.recentHistory,
                         hasMore = state.recentHistoryHasMore,
                         isLoadingMore = state.recentHistoryIsLoadingMore,
                         onLoadMore = vm::loadMoreRecent,
+                        onMoviePlay = vm::playRecentMovie,
+                        onMovieClick = onMovieClick,
+                        onEpisodePlay = vm::playRecentEpisode,
+                        onEpisodeClick = onEpisodeClick,
                     )
                 }
             }
@@ -182,11 +217,14 @@ fun TraktScreen(vm: TraktViewModel = viewModel()) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ContinueWatchingList(
     shows: List<TraktWatchedShow>,
     progressMap: Map<String, TraktShowProgress>,
+    posters: Map<Int, String?>,
     onPlay: (TraktWatchedShow) -> Unit,
+    onShowClick: (Int) -> Unit,
 ) {
     if (shows.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -197,6 +235,7 @@ private fun ContinueWatchingList(
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
         items(shows) { watched ->
             val slug = watched.show.ids.slug ?: ""
+            val tmdbId = watched.show.ids.tmdb
             val prog = progressMap[slug]
             val nextEp = prog?.nextEpisode
             val initials = watched.show.title
@@ -204,11 +243,13 @@ private fun ContinueWatchingList(
                 .take(2)
                 .mapNotNull { it.firstOrNull()?.uppercaseChar() }
                 .joinToString("")
+            val posterPath = tmdbId?.let { posters[it] }
             val progressFraction = prog?.let {
                 if (it.aired > 0) (it.completed.toFloat() / it.aired).coerceIn(0f, 1f) else 0f
             } ?: 0f
 
             Card(
+                onClick = { tmdbId?.let(onShowClick) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp),
@@ -227,11 +268,20 @@ private fun ContinueWatchingList(
                             .background(placeholderColor(watched.show.title)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = initials,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.7f),
-                        )
+                        if (posterPath != null) {
+                            AsyncImage(
+                                model = FenLightApp.posterUrl(posterPath, "w185"),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            Text(
+                                text = initials,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.7f),
+                            )
+                        }
                     }
 
                     Column(
@@ -331,6 +381,8 @@ private fun WatchlistTab(
     movies: List<TraktListItem>,
     shows: List<TraktListItem>,
     onPlayMovie: (TraktListItem) -> Unit,
+    onMovieClick: (Int) -> Unit,
+    onShowClick: (Int) -> Unit,
 ) {
     if (movies.isEmpty() && shows.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -360,6 +412,7 @@ private fun WatchlistTab(
                             }
                         }
                     },
+                    modifier = movie.ids.tmdb?.let { id -> Modifier.clickable { onMovieClick(id) } } ?: Modifier,
                 )
                 HorizontalDivider()
             }
@@ -378,9 +431,67 @@ private fun WatchlistTab(
                 ListItem(
                     headlineContent = { Text(show.title) },
                     supportingContent = { show.year?.let { Text(it.toString()) } },
+                    modifier = show.ids.tmdb?.let { id -> Modifier.clickable { onShowClick(id) } } ?: Modifier,
                 )
                 HorizontalDivider()
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ListItemsScreen(
+    listName: String,
+    listSlug: String,
+    isMine: Boolean,
+    enrichedItems: List<PaginatedItem>,
+    typeMap: Map<Int, String>,
+    isLoading: Boolean,
+    isRefreshing: Boolean,
+    isLoadingMore: Boolean,
+    hasMore: Boolean,
+    onLoadMore: () -> Unit,
+    onRefresh: () -> Unit,
+    onMovieClick: (Int) -> Unit,
+    onShowClick: (Int) -> Unit,
+) {
+    var selectedItem by remember { mutableStateOf<PaginatedItem?>(null) }
+
+    selectedItem?.let { item ->
+        val mediaType = typeMap[item.id] ?: "movie"
+        ListManagementSheet(
+            mediaId = item.id,
+            mediaType = mediaType,
+            title = item.title,
+            posterUrl = item.posterUrl,
+            currentTraktListSlug = if (isMine) listSlug else null,
+            currentTraktListName = if (isMine) listName else null,
+            onDismiss = { selectedItem = null },
+        )
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        if (isLoading && enrichedItems.isEmpty()) {
+            LoadingIndicator(modifier = Modifier.padding(32.dp))
+            return@Column
+        }
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            PaginatedGrid(
+                items = enrichedItems,
+                isLoading = isLoadingMore,
+                hasMore = hasMore,
+                onLoadMore = onLoadMore,
+                onItemClick = { item ->
+                    if (typeMap[item.id] == "show") onShowClick(item.id) else onMovieClick(item.id)
+                },
+                onItemLongClick = { selectedItem = it },
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
@@ -391,6 +502,10 @@ private fun RecentTab(
     hasMore: Boolean,
     isLoadingMore: Boolean,
     onLoadMore: () -> Unit,
+    onMoviePlay: (TraktHistoryEntry) -> Unit = {},
+    onMovieClick: (Int) -> Unit = {},
+    onEpisodePlay: (TraktHistoryEntry) -> Unit = {},
+    onEpisodeClick: (showId: Int, season: Int, episode: Int) -> Unit = { _, _, _ -> },
 ) {
     if (history.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -399,7 +514,8 @@ private fun RecentTab(
         return
     }
     val listState = rememberLazyListState()
-    val shouldLoadMore by remember {
+    // Keyed remember, or the lambda keeps the first composition's history/hasMore values
+    val shouldLoadMore by remember(history.size, isLoadingMore, hasMore) {
         derivedStateOf {
             val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
             last >= history.size - 5 && !isLoadingMore && hasMore
@@ -411,8 +527,7 @@ private fun RecentTab(
         items(history, key = { it.id }) { entry ->
             val title = when (entry.type) {
                 "movie" -> entry.movie?.title ?: "Unknown"
-                "episode" -> entry.show?.title ?: "Unknown"
-                else -> entry.movie?.title ?: entry.show?.title ?: "Unknown"
+                else -> entry.show?.title ?: "Unknown"
             }
             val supporting = buildString {
                 when (entry.type) {
@@ -423,116 +538,51 @@ private fun RecentTab(
                             if (!ep.title.isNullOrBlank()) append(" · ${ep.title}")
                         }
                     }
-                    "movie" -> {
-                        entry.movie?.year?.let { append(it.toString()) }
-                    }
+                    "movie" -> entry.movie?.year?.let { append(it.toString()) }
                 }
                 val watchedDate = entry.watchedAt.take(10)
                 if (isNotEmpty()) append(" · ")
                 append(watchedDate)
             }
+            val rowModifier = when (entry.type) {
+                "movie" -> entry.movie?.ids?.tmdb?.let { id -> Modifier.clickable { onMovieClick(id) } } ?: Modifier
+                "episode" -> entry.show?.ids?.tmdb?.let { showId ->
+                    val ep = entry.episode
+                    if (ep != null) Modifier.clickable { onEpisodeClick(showId, ep.season, ep.number) }
+                    else Modifier
+                } ?: Modifier
+                else -> Modifier
+            }
             ListItem(
                 headlineContent = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                supportingContent = { if (supporting.isNotEmpty()) Text(supporting, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                supportingContent = {
+                    if (supporting.isNotEmpty()) Text(
+                        supporting,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+                trailingContent = {
+                    when (entry.type) {
+                        "movie" -> if (entry.movie?.ids?.tmdb != null) {
+                            IconButton(onClick = { onMoviePlay(entry) }) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                        "episode" -> if (entry.show?.ids?.tmdb != null && entry.episode != null) {
+                            IconButton(onClick = { onEpisodePlay(entry) }) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                },
+                modifier = rowModifier,
             )
             HorizontalDivider()
         }
         if (isLoadingMore) {
             item {
                 LoadingIndicator(modifier = Modifier.padding(16.dp))
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
-@Composable
-private fun ListItemsScreen(
-    listName: String,
-    listSlug: String,
-    isMine: Boolean,
-    items: List<TraktListItem>,
-    isLoading: Boolean,
-    isRefreshing: Boolean,
-    isLoadingMore: Boolean,
-    hasMore: Boolean,
-    onLoadMore: () -> Unit,
-    onRefresh: () -> Unit,
-    onBack: () -> Unit,
-    onPlayMovie: (TraktListItem) -> Unit,
-) {
-    val listState = rememberLazyListState()
-    val shouldLoadMore by remember {
-        derivedStateOf {
-            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            last >= items.size - 5 && !isLoadingMore && hasMore
-        }
-    }
-    LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) onLoadMore() }
-
-    var selectedItem by remember { mutableStateOf<TraktListItem?>(null) }
-
-    selectedItem?.let { item ->
-        val tmdbId = item.movie?.ids?.tmdb ?: item.show?.ids?.tmdb
-        val mediaType = if (item.type == "show") "show" else "movie"
-        val title = item.movie?.title ?: item.show?.title ?: ""
-        if (tmdbId != null) {
-            ListManagementSheet(
-                mediaId = tmdbId,
-                mediaType = mediaType,
-                title = title,
-                posterUrl = null,
-                currentTraktListSlug = if (isMine) listSlug else null,
-                currentTraktListName = if (isMine) listName else null,
-                onDismiss = { selectedItem = null },
-            )
-        } else {
-            selectedItem = null
-        }
-    }
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = { Text(listName) },
-            navigationIcon = {
-                IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
-            },
-        )
-        if (isLoading && items.isEmpty()) {
-            LoadingIndicator(modifier = Modifier.padding(32.dp))
-            return@Column
-        }
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = onRefresh,
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
-                items(items) { item ->
-                    val title = item.movie?.title ?: item.show?.title ?: "Unknown"
-                    val year = (item.movie?.year ?: item.show?.year)?.toString() ?: ""
-                    ListItem(
-                        headlineContent = { Text(title) },
-                        supportingContent = { Text(year + if (item.type.isNotBlank()) " · ${item.type}" else "") },
-                        trailingContent = {
-                            if (item.type == "movie" && item.movie?.ids?.tmdb != null) {
-                                IconButton(onClick = { onPlayMovie(item) }) {
-                                    Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = MaterialTheme.colorScheme.primary)
-                                }
-                            }
-                        },
-                        modifier = Modifier.combinedClickable(
-                            onClick = {},
-                            onLongClick = { selectedItem = item },
-                        ),
-                    )
-                    HorizontalDivider()
-                }
-                if (isLoadingMore) {
-                    item {
-                        LoadingIndicator(modifier = Modifier.padding(16.dp))
-                    }
-                }
             }
         }
     }

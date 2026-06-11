@@ -35,9 +35,14 @@ class AppPreferences(private val context: Context) {
         private val REGION = stringPreferencesKey("region")
         private val EXCLUDE_ADULT = booleanPreferencesKey("exclude_adult")
 
+        private val MOVIE_BROWSE_ROWS = stringPreferencesKey("movie_browse_rows")
+        private val TV_BROWSE_ROWS    = stringPreferencesKey("tv_browse_rows")
+
         private val TMDB_USERNAME = stringPreferencesKey("tmdb_username")
         private val TRAKT_USERNAME = stringPreferencesKey("trakt_username")
         private val RD_USERNAME = stringPreferencesKey("rd_username")
+
+        private val THEME_MODE = stringPreferencesKey("theme_mode")
     }
 
     val kodiHost: Flow<String> = context.dataStore.data.map { it[KODI_HOST] ?: "" }
@@ -63,9 +68,14 @@ class AppPreferences(private val context: Context) {
     val region: Flow<String> = context.dataStore.data.map { it[REGION] ?: "" }
     val excludeAdult: Flow<Boolean> = context.dataStore.data.map { it[EXCLUDE_ADULT] ?: true }
 
+    val movieBrowseRowsJson: Flow<String> = context.dataStore.data.map { it[MOVIE_BROWSE_ROWS] ?: "" }
+    val tvBrowseRowsJson: Flow<String> = context.dataStore.data.map { it[TV_BROWSE_ROWS] ?: "" }
+
     val tmdbUsername: Flow<String> = context.dataStore.data.map { it[TMDB_USERNAME] ?: "" }
     val traktUsername: Flow<String> = context.dataStore.data.map { it[TRAKT_USERNAME] ?: "" }
     val rdUsername: Flow<String> = context.dataStore.data.map { it[RD_USERNAME] ?: "" }
+
+    val themeMode: Flow<String> = context.dataStore.data.map { it[THEME_MODE] ?: "system" }
 
     suspend fun setCheckUpdateOnStartup(enabled: Boolean) {
         context.dataStore.edit { it[CHECK_UPDATE_ON_STARTUP] = enabled }
@@ -164,5 +174,21 @@ class AppPreferences(private val context: Context) {
 
     suspend fun saveRdUsername(username: String) {
         context.dataStore.edit { if (username.isBlank()) it.remove(RD_USERNAME) else it[RD_USERNAME] = username }
+    }
+
+    suspend fun setThemeMode(mode: String) {
+        context.dataStore.edit { it[THEME_MODE] = mode }
+    }
+
+    suspend fun saveMovieBrowseRows(json: String) {
+        context.dataStore.edit {
+            if (json.isBlank()) it.remove(MOVIE_BROWSE_ROWS) else it[MOVIE_BROWSE_ROWS] = json
+        }
+    }
+
+    suspend fun saveTvBrowseRows(json: String) {
+        context.dataStore.edit {
+            if (json.isBlank()) it.remove(TV_BROWSE_ROWS) else it[TV_BROWSE_ROWS] = json
+        }
     }
 }

@@ -10,6 +10,8 @@ import com.fenlight.companion.data.model.TraktList
 import com.fenlight.companion.data.model.TraktListItem
 import com.fenlight.companion.data.model.TraktShowProgress
 import com.fenlight.companion.data.model.TraktWatchedShow
+import com.fenlight.companion.ui.components.PaginatedItem
+import com.fenlight.companion.util.Pagination
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -25,9 +27,12 @@ data class TraktUiState(
     val error: String? = null,
     val watchedShows: List<TraktWatchedShow> = emptyList(),
     val showProgressMap: Map<String, TraktShowProgress> = emptyMap(),
+    val continueWatchingPosters: Map<Int, String?> = emptyMap(), // tmdbId -> poster path
     val myLists: List<TraktList> = emptyList(),
     val likedLists: List<TraktList> = emptyList(),
     val listItems: List<TraktListItem> = emptyList(),
+    val listItemsEnriched: List<PaginatedItem> = emptyList(),
+    val listItemTypeMap: Map<Int, String> = emptyMap(),
     val listItemPage: Int = 0,
     val listItemHasMore: Boolean = false,
     val listItemIsLoadingMore: Boolean = false,
@@ -102,7 +107,7 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
-                val api = app.buildAuthedTraktApi(app.getValidTraktAccessToken())
+                val api = app.authedTraktApi
                 val allShows = api.watchedShows()
                     .sortedByDescending { it.lastWatchedAt }
                     .take(30)
@@ -124,8 +129,16 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
                     airDate == null || airDate <= today
                 }
 
+                // Fetch TMDB poster art for each show in parallel (Trakt provides no artwork).
+                val posters = coroutineScope {
+                    filtered.mapNotNull { w ->
+                        val tmdb = w.show.ids.tmdb ?: return@mapNotNull null
+                        async { runCatching { tmdb to app.tmdbApi.tvDetail(tmdb, "").posterPath }.getOrNull() }
+                    }.awaitAll().filterNotNull().toMap()
+                }
+
                 tabFetchedAt[TraktTab.CONTINUE_WATCHING] = System.currentTimeMillis()
-                _state.update { it.copy(isLoading = false, isRefreshing = false, watchedShows = filtered, showProgressMap = progressMap) }
+                _state.update { it.copy(isLoading = false, isRefreshing = false, watchedShows = filtered, showProgressMap = progressMap, continueWatchingPosters = posters) }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.message) }
             }
@@ -136,7 +149,7 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
-                val api = app.buildAuthedTraktApi(app.getValidTraktAccessToken())
+                val api = app.authedTraktApi
                 val lists = api.myLists()
                 tabFetchedAt[TraktTab.MY_LISTS] = System.currentTimeMillis()
                 _state.update { it.copy(isLoading = false, isRefreshing = false, myLists = lists) }
@@ -150,7 +163,7 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
-                val api = app.buildAuthedTraktApi(app.getValidTraktAccessToken())
+                val api = app.authedTraktApi
                 val response = api.likedLists(page = 1, limit = 50)
                 val liked = response.body() ?: emptyList()
                 tabFetchedAt[TraktTab.LIKED_LISTS] = System.currentTimeMillis()
@@ -165,7 +178,7 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
-                val api = app.buildAuthedTraktApi(app.getValidTraktAccessToken())
+                val api = app.authedTraktApi
                 coroutineScope {
                     val movies = async { api.getWatchlist("movies") }
                     val shows = async { api.getWatchlist("shows") }
@@ -187,10 +200,10 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
-                val api = app.buildAuthedTraktApi(app.getValidTraktAccessToken())
+                val api = app.authedTraktApi
                 val response = api.history(page = 1, limit = 50)
                 val entries = response.body() ?: emptyList()
-                val totalPages = response.headers()["X-Pagination-Page-Count"]?.toIntOrNull() ?: 1
+                val pagesHeader = response.headers()[Pagination.TRAKT_PAGE_COUNT_HEADER]
                 tabFetchedAt[TraktTab.RECENT] = System.currentTimeMillis()
                 _state.update {
                     it.copy(
@@ -198,7 +211,7 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
                         isRefreshing = false,
                         recentHistory = entries,
                         recentHistoryPage = 1,
-                        recentHistoryHasMore = 1 < totalPages,
+                        recentHistoryHasMore = Pagination.hasMoreByTraktHeader(pagesHeader, 1),
                     )
                 }
             } catch (e: Exception) {
@@ -213,17 +226,17 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.update { it.copy(recentHistoryIsLoadingMore = true) }
             try {
-                val api = app.buildAuthedTraktApi(app.getValidTraktAccessToken())
+                val api = app.authedTraktApi
                 val nextPage = s.recentHistoryPage + 1
                 val response = api.history(page = nextPage, limit = 50)
                 val entries = response.body() ?: emptyList()
-                val totalPages = response.headers()["X-Pagination-Page-Count"]?.toIntOrNull() ?: 1
+                val pagesHeader = response.headers()[Pagination.TRAKT_PAGE_COUNT_HEADER]
                 _state.update {
                     it.copy(
                         recentHistoryIsLoadingMore = false,
                         recentHistory = it.recentHistory + entries,
                         recentHistoryPage = nextPage,
-                        recentHistoryHasMore = nextPage < totalPages,
+                        recentHistoryHasMore = Pagination.hasMoreByTraktHeader(pagesHeader, nextPage),
                     )
                 }
             } catch (e: Exception) {
@@ -241,6 +254,8 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
                 selectedListSlug = slug,
                 selectedListUser = user,
                 listItems = emptyList(),
+                listItemsEnriched = emptyList(),
+                listItemTypeMap = emptyMap(),
                 listItemPage = 0,
                 listItemHasMore = false,
             )
@@ -258,22 +273,57 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.update { it.copy(listItemIsLoadingMore = append, isLoading = !append) }
             try {
-                val api = app.buildAuthedTraktApi(app.getValidTraktAccessToken())
+                val api = app.authedTraktApi
                 val response = if (user == "me") {
                     api.myListItems(slug, page = page)
                 } else {
                     api.listItems(user, slug, page = page)
                 }
                 val newItems = response.body() ?: emptyList()
-                val totalPages = response.headers()["X-Pagination-Page-Count"]?.toIntOrNull() ?: 1
+                val pagesHeader = response.headers()[Pagination.TRAKT_PAGE_COUNT_HEADER]
+
+                val enrichedPairs = coroutineScope {
+                    newItems.map { item ->
+                        async {
+                            val tmdbId = item.movie?.ids?.tmdb ?: item.show?.ids?.tmdb
+                                ?: return@async null
+                            runCatching {
+                                if (item.type == "movie") {
+                                    val d = app.tmdbApi.movieDetail(tmdbId, "")
+                                    PaginatedItem(
+                                        id = d.id,
+                                        title = d.title,
+                                        posterUrl = FenLightApp.posterUrl(d.posterPath),
+                                        rating = d.voteAverage.takeIf { it > 0 },
+                                        backdropUrl = FenLightApp.backdropUrl(d.backdropPath),
+                                    )
+                                } else {
+                                    val d = app.tmdbApi.tvDetail(tmdbId, "")
+                                    PaginatedItem(
+                                        id = d.id,
+                                        title = d.name,
+                                        posterUrl = FenLightApp.posterUrl(d.posterPath),
+                                        rating = d.voteAverage.takeIf { it > 0 },
+                                        backdropUrl = FenLightApp.backdropUrl(d.backdropPath),
+                                    )
+                                } to item.type
+                            }.getOrNull()
+                        }
+                    }.awaitAll().filterNotNull()
+                }
+                val enrichedItems = enrichedPairs.map { it.first }
+                val typeMap = enrichedPairs.associate { (item, type) -> item.id to type }
+
                 _state.update {
                     it.copy(
                         isLoading = false,
                         isRefreshing = false,
                         listItemIsLoadingMore = false,
                         listItems = if (append) it.listItems + newItems else newItems,
+                        listItemsEnriched = if (append) it.listItemsEnriched + enrichedItems else enrichedItems,
+                        listItemTypeMap = if (append) it.listItemTypeMap + typeMap else typeMap,
                         listItemPage = page,
-                        listItemHasMore = page < totalPages,
+                        listItemHasMore = Pagination.hasMoreByTraktHeader(pagesHeader, page),
                     )
                 }
             } catch (e: Exception) {
@@ -283,7 +333,15 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearListItems() = _state.update {
-        it.copy(listItems = emptyList(), selectedListName = "", selectedListSlug = "", listItemPage = 0, listItemHasMore = false)
+        it.copy(
+            listItems = emptyList(),
+            listItemsEnriched = emptyList(),
+            listItemTypeMap = emptyMap(),
+            selectedListName = "",
+            selectedListSlug = "",
+            listItemPage = 0,
+            listItemHasMore = false,
+        )
     }
 
     fun playNextEpisode(watched: TraktWatchedShow) {
@@ -323,6 +381,41 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun playRecentMovie(entry: TraktHistoryEntry) {
+        viewModelScope.launch {
+            val movie = entry.movie ?: return@launch
+            val tmdbId = movie.ids.tmdb ?: return@launch
+            try {
+                val host = app.prefs.kodiHost.first()
+                val port = app.prefs.kodiPort.first()
+                val user = app.prefs.kodiUser.first()
+                val pass = app.prefs.kodiPass.first()
+                KodiRpc(host, port, user, pass).playMovieViaFenLight(tmdbId, movie.title, movie.year ?: 0)
+                _state.update { it.copy(playMessage = "Playing ${movie.title} on Kodi…") }
+            } catch (e: Exception) {
+                _state.update { it.copy(playMessage = "Failed: ${e.message}") }
+            }
+        }
+    }
+
+    fun playRecentEpisode(entry: TraktHistoryEntry) {
+        viewModelScope.launch {
+            val show = entry.show ?: return@launch
+            val ep = entry.episode ?: return@launch
+            val tmdbId = show.ids.tmdb ?: return@launch
+            try {
+                val host = app.prefs.kodiHost.first()
+                val port = app.prefs.kodiPort.first()
+                val user = app.prefs.kodiUser.first()
+                val pass = app.prefs.kodiPass.first()
+                KodiRpc(host, port, user, pass).playEpisodeViaFenLight(tmdbId, show.title, show.year ?: 0, ep.season, ep.number)
+                _state.update { it.copy(playMessage = "Playing S${ep.season}E${ep.number} of ${show.title} on Kodi…") }
+            } catch (e: Exception) {
+                _state.update { it.copy(playMessage = "Failed: ${e.message}") }
+            }
+        }
+    }
+
     fun clearPlayMessage() = _state.update { it.copy(playMessage = null) }
 
     // List management
@@ -335,7 +428,7 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.update { it.copy(showCreateListDialog = false) }
             try {
-                val api = app.buildAuthedTraktApi(app.getValidTraktAccessToken())
+                val api = app.authedTraktApi
                 api.createList(mapOf(
                     "name" to name,
                     "description" to description,
@@ -355,7 +448,7 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.update { it.copy(listToDelete = null) }
             try {
-                val api = app.buildAuthedTraktApi(app.getValidTraktAccessToken())
+                val api = app.authedTraktApi
                 api.deleteList(slug)
                 tabFetchedAt.remove(TraktTab.MY_LISTS)
                 loadMyLists()
