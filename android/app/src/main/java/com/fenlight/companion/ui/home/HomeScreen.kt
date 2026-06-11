@@ -101,7 +101,7 @@ fun HomeScreen(
             if (showHomeBar) {
                 TopAppBar(
                     title = {
-                        val logoRes = if (isSystemInDarkTheme()) R.drawable.DarkMode else R.drawable.LightMode
+                        val logoRes = if (isSystemInDarkTheme()) R.drawable.logo_dark else R.drawable.logo_light
                         Image(
                             painter = painterResource(logoRes),
                             contentDescription = "FenLight+",
