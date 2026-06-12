@@ -10,6 +10,7 @@ import com.fenlight.companion.data.model.TraktList
 import com.fenlight.companion.data.model.TraktListItem
 import com.fenlight.companion.data.model.TraktShowProgress
 import com.fenlight.companion.data.model.TraktWatchedShow
+import com.fenlight.companion.data.trakt.ContinueWatchingStore
 import com.fenlight.companion.ui.components.PaginatedItem
 import com.fenlight.companion.util.Pagination
 import kotlinx.coroutines.async
@@ -67,6 +68,7 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as FenLightApp
     private val _state = MutableStateFlow(TraktUiState())
     val state: StateFlow<TraktUiState> = _state.asStateFlow()
+    private val cwStore = ContinueWatchingStore(app.prefs, app.moshi)
 
     private companion object { const val CACHE_MS = 24 * 60 * 60 * 1000L }
     private val tabFetchedAt = mutableMapOf<TraktTab, Long>()
@@ -117,40 +119,33 @@ class TraktViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun loadContinueWatching() {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
+            // Show cached data instantly (no spinner if cache is warm)
+            val cached = cwStore.cachedSnapshot()
+            if (cached != null && _state.value.watchedShows.isEmpty()) {
+                _state.update {
+                    it.copy(
+                        watchedShows = cached.shows,
+                        showProgressMap = cached.progressBySlug,
+                        continueWatchingPosters = cached.postersByTmdb,
+                    )
+                }
+            } else {
+                _state.update { it.copy(isLoading = true, error = null) }
+            }
+
             try {
-                val api = app.authedTraktApi
-                val allShows = api.watchedShows()
-                    .sortedByDescending { it.lastWatchedAt }
-                    .take(30)
-
-                // Fetch per-show progress in parallel; ignore individual failures
-                val progressMap = coroutineScope {
-                    allShows.mapNotNull { show ->
-                        val slug = show.show.ids.slug ?: return@mapNotNull null
-                        async { runCatching { slug to api.showProgress(slug) }.getOrNull() }
-                    }.awaitAll().filterNotNull().toMap()
-                }
-
-                // Only keep shows where Trakt knows there is a next episode and it has already aired
-                val today = java.time.LocalDate.now().toString() // "YYYY-MM-DD"
-                val filtered = allShows.filter { show ->
-                    val slug = show.show.ids.slug ?: return@filter false
-                    val nextEp = progressMap[slug]?.nextEpisode ?: return@filter false
-                    val airDate = nextEp.firstAired?.take(10) // "YYYY-MM-DD"
-                    airDate == null || airDate <= today
-                }
-
-                // Fetch TMDB poster art for each show in parallel (Trakt provides no artwork).
-                val posters = coroutineScope {
-                    filtered.mapNotNull { w ->
-                        val tmdb = w.show.ids.tmdb ?: return@mapNotNull null
-                        async { runCatching { tmdb to app.tmdbApi.tvDetail(tmdb, "").posterPath }.getOrNull() }
-                    }.awaitAll().filterNotNull().toMap()
-                }
-
+                val snapshot = cwStore.sync(app.authedTraktApi, app.tmdbApi)
                 tabFetchedAt[TraktTab.CONTINUE_WATCHING] = System.currentTimeMillis()
-                _state.update { it.copy(isLoading = false, isRefreshing = false, watchedShows = filtered, showProgressMap = progressMap, continueWatchingPosters = posters) }
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        error = null,
+                        watchedShows = snapshot.shows,
+                        showProgressMap = snapshot.progressBySlug,
+                        continueWatchingPosters = snapshot.postersByTmdb,
+                    )
+                }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.message) }
             }

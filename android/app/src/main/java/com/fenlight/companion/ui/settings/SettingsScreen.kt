@@ -230,7 +230,10 @@ fun SettingsScreen(
                     setupState.traktAuthed -> {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text("Signed in", color = MaterialTheme.colorScheme.primary)
-                            TextButton(onClick = setupVm::signOutTrakt) { Text("Sign out") }
+                            Row {
+                                TextButton(onClick = vm::clearTraktCwCache) { Text("Clear cache") }
+                                TextButton(onClick = setupVm::signOutTrakt) { Text("Sign out") }
+                            }
                         }
                     }
                     setupState.traktPolling -> {

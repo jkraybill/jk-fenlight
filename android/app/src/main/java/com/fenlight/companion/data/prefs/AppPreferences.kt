@@ -43,6 +43,8 @@ class AppPreferences(private val context: Context) {
         private val RD_USERNAME = stringPreferencesKey("rd_username")
 
         private val THEME_MODE = stringPreferencesKey("theme_mode")
+
+        private val TRAKT_CW_CACHE = stringPreferencesKey("trakt_cw_cache")
     }
 
     val kodiHost: Flow<String> = context.dataStore.data.map { it[KODI_HOST] ?: "" }
@@ -76,6 +78,8 @@ class AppPreferences(private val context: Context) {
     val rdUsername: Flow<String> = context.dataStore.data.map { it[RD_USERNAME] ?: "" }
 
     val themeMode: Flow<String> = context.dataStore.data.map { it[THEME_MODE] ?: "system" }
+
+    val traktCwCacheJson: Flow<String> = context.dataStore.data.map { it[TRAKT_CW_CACHE] ?: "" }
 
     suspend fun setCheckUpdateOnStartup(enabled: Boolean) {
         context.dataStore.edit { it[CHECK_UPDATE_ON_STARTUP] = enabled }
@@ -134,6 +138,7 @@ class AppPreferences(private val context: Context) {
             it.remove(TRAKT_REFRESH_TOKEN)
             it.remove(TRAKT_EXPIRES_AT)
             it.remove(TRAKT_USERNAME)
+            it.remove(TRAKT_CW_CACHE)
         }
     }
 
@@ -189,6 +194,12 @@ class AppPreferences(private val context: Context) {
     suspend fun saveTvBrowseRows(json: String) {
         context.dataStore.edit {
             if (json.isBlank()) it.remove(TV_BROWSE_ROWS) else it[TV_BROWSE_ROWS] = json
+        }
+    }
+
+    suspend fun saveTraktCwCache(json: String) {
+        context.dataStore.edit {
+            if (json.isBlank()) it.remove(TRAKT_CW_CACHE) else it[TRAKT_CW_CACHE] = json
         }
     }
 }

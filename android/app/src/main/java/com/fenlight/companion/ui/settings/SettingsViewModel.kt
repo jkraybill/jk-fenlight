@@ -86,6 +86,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { prefs.setThemeMode(mode) }
     }
 
+    fun clearTraktCwCache() {
+        viewModelScope.launch { prefs.saveTraktCwCache("") }
+    }
+
     fun checkForUpdate() {
         viewModelScope.launch {
             _state.update { it.copy(update = UpdateUiState(checking = true)) }
