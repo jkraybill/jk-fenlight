@@ -74,7 +74,7 @@ interface TraktApi {
     ): Any
 
     @GET("sync/watched/shows")
-    suspend fun watchedShows(): List<TraktWatchedShow>
+    suspend fun watchedShows(@Query("extended") extended: String = "noseasons"): List<TraktWatchedShow>
 
     @GET("shows/{id}/progress/watched")
     suspend fun showProgress(@Path("id") id: String, @Query("extended") extended: String = "full"): TraktShowProgress
