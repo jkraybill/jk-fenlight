@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fenlight.companion.data.model.BrowseRowConfig
+import com.fenlight.companion.data.model.TraktList
 import com.fenlight.companion.ui.components.ErrorMessage
 import com.fenlight.companion.ui.components.ListManagementSheet
 import com.fenlight.companion.ui.components.PaginatedGrid
@@ -25,6 +26,7 @@ fun BrowseAllScreen(
     onItemClick: (Int) -> Unit,
     onShowRecommendations: (Int) -> Unit = {},
     onShowSimilar: (Int) -> Unit = {},
+    onOpenPublicList: ((TraktList) -> Unit)? = null,
     vm: BrowseAllViewModel = viewModel(),
 ) {
     LaunchedEffect(rowConfig.id) { vm.init(rowConfig, mediaType) }
@@ -40,6 +42,7 @@ fun BrowseAllScreen(
             onShowRecommendations = { onShowRecommendations(item.id) },
             onShowSimilar = { onShowSimilar(item.id) },
             onDismiss = { selectedItem = null },
+            onOpenPublicList = onOpenPublicList,
         )
     }
 

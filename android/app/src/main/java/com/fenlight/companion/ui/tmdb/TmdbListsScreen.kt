@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fenlight.companion.FenLightApp
+import com.fenlight.companion.data.model.TraktList
 import com.fenlight.companion.ui.components.ErrorMessage
 import com.fenlight.companion.ui.components.ListManagementSheet
 import com.fenlight.companion.ui.components.LoadingIndicator
@@ -32,6 +33,7 @@ fun TmdbListsScreen(
     onMovieClick: (Int) -> Unit = {},
     onShowClick: (Int) -> Unit = {},
     onGoToSettings: () -> Unit = {},
+    onOpenPublicList: ((TraktList) -> Unit)? = null,
     vm: TmdbListsViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -50,6 +52,7 @@ fun TmdbListsScreen(
             currentTmdbListId = state.selectedListId.takeIf { it != 0 },
             currentTmdbListName = state.selectedListName.takeIf { it.isNotBlank() },
             onDismiss = { selectedItem = null },
+            onOpenPublicList = onOpenPublicList,
         )
     }
 

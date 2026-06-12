@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fenlight.companion.data.model.BrowseRowConfig
 import com.fenlight.companion.data.model.MediaType
+import com.fenlight.companion.data.model.TraktList
 import com.fenlight.companion.ui.components.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -23,6 +24,7 @@ fun MediaBrowseScreen(
     onShowRecommendations: (Int) -> Unit = {},
     onShowSimilar: (Int) -> Unit = {},
     onSeeAll: (BrowseRowConfig) -> Unit = {},
+    onOpenPublicList: ((TraktList) -> Unit)? = null,
     vm: MediaHomeViewModel,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -37,6 +39,7 @@ fun MediaBrowseScreen(
             onShowRecommendations = { onShowRecommendations(item.id) },
             onShowSimilar = { onShowSimilar(item.id) },
             onDismiss = { selectedItem = null },
+            onOpenPublicList = onOpenPublicList,
         )
     }
 

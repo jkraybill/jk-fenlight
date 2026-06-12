@@ -8,7 +8,6 @@ import com.fenlight.companion.FenLightApp
 import com.fenlight.companion.data.model.MediaType
 import com.fenlight.companion.data.model.TmdbList
 import com.fenlight.companion.data.model.TraktList
-import com.fenlight.companion.data.model.TraktListItem
 import com.fenlight.companion.util.MediaTypeMapper
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -29,10 +28,6 @@ data class ListManagementState(
     val listsContainingTraktId: String? = null,
     val listsContainingTraktType: String? = null,
     val likedListIds: Set<Int> = emptySet(), // Trakt list ids the user has liked
-    // Opened list items (nested sheet)
-    val openedList: TraktList? = null,
-    val openedListItems: List<TraktListItem>? = null,
-    val openedListLoading: Boolean = false,
 )
 
 class ListManagementViewModel(application: Application) : AndroidViewModel(application) {
@@ -245,27 +240,6 @@ class ListManagementViewModel(application: Application) : AndroidViewModel(appli
                 _state.update { it.copy(listsContainingLoadingMore = false) }
             }
         }
-    }
-
-    fun openList(list: TraktList) {
-        _state.update { it.copy(openedList = list, openedListItems = null, openedListLoading = true) }
-        viewModelScope.launch {
-            try {
-                val user = list.user?.pathId ?: run {
-                    _state.update { it.copy(openedListItems = emptyList(), openedListLoading = false) }
-                    return@launch
-                }
-                val response = app.traktApi.listItems(user, list.ids.slug)
-                _state.update { it.copy(openedListItems = response.body().orEmpty(), openedListLoading = false) }
-            } catch (e: Exception) {
-                _state.update { it.copy(openedListItems = emptyList(), openedListLoading = false) }
-                toast("Failed to load list: ${e.message}")
-            }
-        }
-    }
-
-    fun closeList() {
-        _state.update { it.copy(openedList = null, openedListItems = null, openedListLoading = false) }
     }
 
     fun toggleListLike(list: TraktList) {
