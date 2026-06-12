@@ -446,8 +446,9 @@ private fun TraktListCard(
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(list.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            if (list.description.isNotBlank()) {
-                Text(list.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+            val desc = list.description
+            if (!desc.isNullOrBlank()) {
+                Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
             }
             val owner = list.user?.username?.takeIf { showOwner && it.isNotBlank() }
             val meta = buildString {
