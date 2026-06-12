@@ -44,6 +44,15 @@ data class TraktList(
 data class TraktUser(
     val username: String,
     val name: String? = null,
+    val ids: TraktUserIds? = null,
+) {
+    // Slug is URL-safe; prefer it for path params (usernames may contain spaces)
+    val pathId: String get() = ids?.slug ?: username
+}
+
+@JsonClass(generateAdapter = true)
+data class TraktUserIds(
+    val slug: String? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -142,17 +151,6 @@ data class TraktWatchedEpisode(
 data class TraktUserSettings(val user: TraktUser)
 
 @JsonClass(generateAdapter = true)
-data class TraktHistoryEntry(
-    val id: Long,
-    val action: String,
-    @Json(name = "watched_at") val watchedAt: String,
-    val type: String,
-    val movie: TraktMovie? = null,
-    val show: TraktShow? = null,
-    val episode: TraktEpisode? = null,
-)
-
-@JsonClass(generateAdapter = true)
 data class TraktTrendingMovie(
     val watchers: Int,
     val movie: TraktMovie,
@@ -162,4 +160,22 @@ data class TraktTrendingMovie(
 data class TraktTrendingShow(
     val watchers: Int,
     val show: TraktShow,
+)
+
+// GET /search/list returns [{type:"list", score, list:{...}}]
+@JsonClass(generateAdapter = true)
+data class TraktListSearchResult(
+    val type: String,
+    val list: TraktList,
+)
+
+@JsonClass(generateAdapter = true)
+data class TraktHistoryEntry(
+    val id: Long,
+    val action: String,
+    @Json(name = "watched_at") val watchedAt: String,
+    val type: String,
+    val movie: TraktMovie? = null,
+    val show: TraktShow? = null,
+    val episode: TraktEpisode? = null,
 )

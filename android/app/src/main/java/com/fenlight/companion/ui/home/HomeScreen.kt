@@ -102,6 +102,7 @@ fun HomeScreen(
             if (showHomeBar) {
                 TopAppBar(
                     title = {
+                        // Follow the applied app theme (user-selectable), not the OS setting
                         val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
                         val logoRes = if (isDark) R.drawable.logo_dark else R.drawable.logo_light
                         Image(

@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -30,6 +31,7 @@ import com.fenlight.companion.ui.components.rememberPlayMessageSnackbar
 fun TmdbListsScreen(
     onMovieClick: (Int) -> Unit = {},
     onShowClick: (Int) -> Unit = {},
+    onGoToSettings: () -> Unit = {},
     vm: TmdbListsViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -101,14 +103,31 @@ fun TmdbListsScreen(
         )
     }
 
+    val drilledIn = state.listItems.isNotEmpty() || state.selectedListName.isNotEmpty()
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            if (state.isAuthenticated && state.listItems.isEmpty() && state.selectedListName.isEmpty() && !state.isLoading) {
-                FloatingActionButton(onClick = vm::showCreateListDialog) {
-                    Icon(Icons.Default.Add, contentDescription = "Create list")
-                }
-            }
+        topBar = {
+            TopAppBar(
+                title = { Text(if (drilledIn) state.selectedListName else "Lists") },
+                navigationIcon = {
+                    if (drilledIn) {
+                        IconButton(onClick = vm::clearListItems) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
+                    }
+                },
+                actions = {
+                    if (!drilledIn) {
+                        if (state.isAuthenticated && !state.isLoading) {
+                            IconButton(onClick = vm::showCreateListDialog) {
+                                Icon(Icons.Default.Add, contentDescription = "Create list")
+                            }
+                        }
+                        IconButton(onClick = onGoToSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        }
+                    }
+                },
+            )
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
@@ -126,11 +145,7 @@ fun TmdbListsScreen(
                 return@Column
             }
 
-            if (state.listItems.isNotEmpty() || state.selectedListName.isNotEmpty()) {
-                TopAppBar(
-                    title = { Text(state.selectedListName) },
-                    navigationIcon = { IconButton(onClick = vm::clearListItems) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") } },
-                )
+            if (drilledIn) {
                 if (state.isLoading) { LoadingIndicator(modifier = Modifier.padding(32.dp)); return@Column }
                 val mediaTypeById = remember(state.listItems) {
                     state.listItems.associate { it.id to it.mediaType }

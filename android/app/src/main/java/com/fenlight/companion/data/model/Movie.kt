@@ -30,6 +30,15 @@ data class MovieCollection(
 )
 
 @JsonClass(generateAdapter = true)
+data class MovieCollectionDetail(
+    val id: Int,
+    val name: String,
+    @Json(name = "poster_path") val posterPath: String? = null,
+    @Json(name = "backdrop_path") val backdropPath: String? = null,
+    val parts: List<Movie> = emptyList(),
+)
+
+@JsonClass(generateAdapter = true)
 data class TvShow(
     val id: Int,
     val name: String,
@@ -44,6 +53,9 @@ data class TvShow(
     val seasons: List<SeasonSummary>?,
     val credits: Credits?,
     val videos: VideoResults?,
+    // TMDB sends this on tv details and search/tv results, but not discover/tv
+    // (discover filters server-side via include_adult)
+    val adult: Boolean = false,
 )
 
 @JsonClass(generateAdapter = true)

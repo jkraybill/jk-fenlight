@@ -13,6 +13,8 @@ data class MovieDetailUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val movie: Movie? = null,
+    val collectionName: String? = null,
+    val collectionParts: List<Movie> = emptyList(),
     val playMessage: String? = null,
 )
 
@@ -29,10 +31,21 @@ class MovieDetailViewModel(application: Application) : AndroidViewModel(applicat
 
     fun loadMovieDetail(tmdbId: Int) {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
+            _state.update { it.copy(isLoading = true, error = null, collectionName = null, collectionParts = emptyList()) }
             try {
                 val movie = app.tmdbApi.movieDetail(tmdbId)
                 _state.update { it.copy(isLoading = false, movie = movie) }
+
+                // If the movie is part of a collection, load the other films in it as a row.
+                movie.belongsToCollection?.let { collection ->
+                    try {
+                        val detail = app.tmdbApi.collectionDetail(collection.id)
+                        val parts = detail.parts.sortedBy { it.releaseDate ?: "" }
+                        _state.update { it.copy(collectionName = detail.name, collectionParts = parts) }
+                    } catch (_: Exception) {
+                        // Collection art is non-critical; ignore failures.
+                    }
+                }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, error = e.message) }
             }

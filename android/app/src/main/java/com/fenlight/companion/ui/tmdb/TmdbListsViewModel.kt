@@ -8,6 +8,7 @@ import com.fenlight.companion.data.api.KodiRpc
 import com.fenlight.companion.data.model.TmdbList
 import com.fenlight.companion.data.model.TmdbListItem
 import com.fenlight.companion.ui.components.PaginatedItem
+import com.fenlight.companion.util.Pagination
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -54,8 +55,7 @@ class TmdbListsViewModel(application: Application) : AndroidViewModel(applicatio
             }
             _state.update { it.copy(isLoading = true, error = null, isAuthenticated = true) }
             try {
-                val v4 = app.buildTmdbV4Api(accessToken)
-                val result = v4.accountLists(accountId)
+                val result = app.tmdbV4Api.accountLists(accountId)
                 listsFetchedAt = System.currentTimeMillis()
                 _state.update { it.copy(isLoading = false, isRefreshing = false, lists = result.results, listItems = emptyList(), selectedListName = "") }
             } catch (e: Exception) {
@@ -97,9 +97,7 @@ class TmdbListsViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             _state.update { it.copy(listItemIsLoadingMore = append, isLoading = !append) }
             try {
-                val accessToken = app.prefs.tmdbAccessToken.first()
-                val v4 = app.buildTmdbV4Api(accessToken)
-                val detail = v4.listDetail(listId, page)
+                val detail = app.tmdbV4Api.listDetail(listId, page)
                 _state.update {
                     it.copy(
                         isLoading = false,
@@ -107,7 +105,7 @@ class TmdbListsViewModel(application: Application) : AndroidViewModel(applicatio
                         listItemIsLoadingMore = false,
                         listItems = if (append) it.listItems + detail.results else detail.results,
                         listItemPage = page,
-                        listItemHasMore = page < detail.totalPages,
+                        listItemHasMore = Pagination.hasMoreByPageCount(page, detail.totalPages),
                     )
                 }
             } catch (e: Exception) {
@@ -152,8 +150,7 @@ class TmdbListsViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             _state.update { it.copy(showCreateListDialog = false) }
             try {
-                val accessToken = app.prefs.tmdbAccessToken.first()
-                app.buildTmdbV4Api(accessToken).createList(mapOf(
+                app.tmdbV4Api.createList(mapOf(
                     "name" to name,
                     "description" to description,
                     "iso_3166_1" to "US",
@@ -172,8 +169,7 @@ class TmdbListsViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             _state.update { it.copy(listToDelete = null) }
             try {
-                val accessToken = app.prefs.tmdbAccessToken.first()
-                app.buildTmdbV4Api(accessToken).deleteList(listId)
+                app.tmdbV4Api.deleteList(listId)
                 listsFetchedAt = 0L
                 loadLists(force = true)
             } catch (e: Exception) {

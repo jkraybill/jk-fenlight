@@ -2,6 +2,8 @@ package com.fenlight.companion.ui.movies
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +28,7 @@ import coil.compose.AsyncImage
 import com.fenlight.companion.FenLightApp
 import com.fenlight.companion.ui.components.CastRow
 import com.fenlight.companion.ui.components.ErrorMessage
+import com.fenlight.companion.ui.components.MediaCard
 import com.fenlight.companion.ui.components.rememberPlayMessageSnackbar
 
 @Composable
@@ -33,6 +36,7 @@ fun MovieDetailScreen(
     tmdbId: Int,
     onBack: () -> Unit,
     onPersonClick: (Int) -> Unit = {},
+    onMovieClick: (Int) -> Unit = {},
     vm: MovieDetailViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -151,9 +155,23 @@ fun MovieDetailScreen(
                         Text(movie.overview, style = MaterialTheme.typography.bodyMedium)
                     }
 
-                    movie.belongsToCollection?.name?.takeIf { it.isNotBlank() }?.let { seriesName ->
-                        Text("Series", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Text(seriesName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+                    val collectionParts = state.collectionParts
+                    if (collectionParts.isNotEmpty()) {
+                        Text(
+                            state.collectionName ?: "Collection",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(collectionParts, key = { it.id }) { part ->
+                                MediaCard(
+                                    title = part.title,
+                                    posterUrl = FenLightApp.posterUrl(part.posterPath),
+                                    rating = part.voteAverage.takeIf { it > 0 },
+                                    onClick = { onMovieClick(part.id) },
+                                )
+                            }
+                        }
                     }
 
                     val directors = movie.credits?.crew?.filter { it.job == "Director" }?.map { it.name }

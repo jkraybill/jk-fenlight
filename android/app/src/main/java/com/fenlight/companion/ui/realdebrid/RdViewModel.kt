@@ -9,6 +9,7 @@ import com.fenlight.companion.data.model.RdDownload
 import com.fenlight.companion.data.model.RdFile
 import com.fenlight.companion.data.model.RdTorrent
 import com.fenlight.companion.data.model.RdTorrentInfo
+import com.fenlight.companion.util.Pagination
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -44,7 +45,7 @@ class RdViewModel(application: Application) : AndroidViewModel(application) {
 
     init { loadTorrents() }
 
-    private suspend fun rdApi() = app.buildAuthedRdApi(app.getValidRdAccessToken())
+    private fun rdApi() = app.authedRdApi
 
     fun selectTab(tab: RdTab) {
         _state.update { it.copy(tab = tab) }
@@ -88,7 +89,7 @@ class RdViewModel(application: Application) : AndroidViewModel(application) {
                         torrentIsLoadingMore = false,
                         torrents = if (append) it.torrents + results else results,
                         torrentPage = page,
-                        torrentHasMore = results.size == PAGE_SIZE,
+                        torrentHasMore = Pagination.hasMoreByPageSize(results.size, PAGE_SIZE),
                     )
                 }
             } catch (e: Exception) {
@@ -121,7 +122,7 @@ class RdViewModel(application: Application) : AndroidViewModel(application) {
                         downloadIsLoadingMore = false,
                         downloads = if (append) it.downloads + results else results,
                         downloadPage = page,
-                        downloadHasMore = results.size == PAGE_SIZE,
+                        downloadHasMore = Pagination.hasMoreByPageSize(results.size, PAGE_SIZE),
                     )
                 }
             } catch (e: Exception) {

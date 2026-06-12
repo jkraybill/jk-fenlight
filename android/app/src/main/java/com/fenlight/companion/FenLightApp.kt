@@ -2,40 +2,48 @@ package com.fenlight.companion
 
 import android.app.Application
 import com.fenlight.companion.data.api.RealDebridApi
+import com.fenlight.companion.data.auth.RefreshedTokens
+import com.fenlight.companion.data.auth.StoredTokens
+import com.fenlight.companion.data.auth.TokenRefresher
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import com.fenlight.companion.data.api.TmdbApi
 import com.fenlight.companion.data.api.TmdbV4Api
 import com.fenlight.companion.data.api.TraktApi
 import com.fenlight.companion.data.prefs.AppPreferences
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import kotlinx.coroutines.runBlocking
+import okhttp3.Cache
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import java.io.File
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 class FenLightApp : Application() {
 
     val prefs by lazy { AppPreferences(this) }
 
-    private val moshi = Moshi.Builder()
+    val moshi = Moshi.Builder()
         .addLast(KotlinJsonAdapterFactory())
         .build()
 
-    private val baseOkHttp = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .apply {
-            if (BuildConfig.DEBUG) {
-                addInterceptor(HttpLoggingInterceptor().apply {
-                    level = HttpLoggingInterceptor.Level.BASIC
-                })
+    private val baseOkHttp by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .cache(Cache(File(cacheDir, "http_cache"), 50L * 1024 * 1024))
+            .apply {
+                if (BuildConfig.DEBUG) {
+                    addInterceptor(HttpLoggingInterceptor().apply {
+                        level = HttpLoggingInterceptor.Level.BASIC
+                    })
+                }
             }
-        }
-        .build()
+            .build()
+    }
 
 	val tmdbReadAccessToken = BuildConfig.TMDB_READ_ACCESS_TOKEN
 	val traktClientId = BuildConfig.TRAKT_CLIENT_ID
@@ -61,13 +69,15 @@ class FenLightApp : Application() {
             .create(TmdbApi::class.java)
     }
 
-    fun buildTmdbV4Api(userAccessToken: String): TmdbV4Api {
-        val token = userAccessToken.ifBlank { tmdbReadAccessToken }
-        return Retrofit.Builder()
+    // Shared v4 client; resolves the user token at request time, falling back to the read token.
+    val tmdbV4Api: TmdbV4Api by lazy {
+        Retrofit.Builder()
             .baseUrl("https://api.themoviedb.org/4/")
             .client(
                 baseOkHttp.newBuilder()
                     .addInterceptor { chain ->
+                        val userToken = runBlocking { prefs.tmdbAccessToken.first() }
+                        val token = userToken.ifBlank { tmdbReadAccessToken }
                         val req = chain.request().newBuilder()
                             .header("Authorization", "Bearer $token")
                             .header("Content-Type", "application/json;charset=utf-8")
@@ -102,12 +112,17 @@ class FenLightApp : Application() {
             .create(TraktApi::class.java)
     }
 
-    fun buildAuthedTraktApi(accessToken: String): TraktApi {
-        return Retrofit.Builder()
+    // Shared authed client; refreshes the token at request time when close to expiry.
+    val authedTraktApi: TraktApi by lazy {
+        Retrofit.Builder()
             .baseUrl("https://api.trakt.tv/")
             .client(
                 baseOkHttp.newBuilder()
+                    // Own dispatcher: the token refresh below runs on the base client, which must
+                    // not queue behind authed calls blocked in this interceptor (per-host limit).
+                    .dispatcher(okhttp3.Dispatcher())
                     .addInterceptor { chain ->
+                        val accessToken = fetchTokenForRequest { getValidTraktAccessToken() }
                         chain.proceed(
                             chain.request().newBuilder()
                                 .header("Content-Type", "application/json")
@@ -124,9 +139,6 @@ class FenLightApp : Application() {
             .create(TraktApi::class.java)
     }
 
-    private val rdRefreshMutex = Mutex()
-    private val traktRefreshMutex = Mutex()
-
     // RD base (no auth) for device code / credential exchange
     val rdBaseApi: RealDebridApi by lazy {
         Retrofit.Builder()
@@ -137,12 +149,16 @@ class FenLightApp : Application() {
             .create(RealDebridApi::class.java)
     }
 
-    fun buildAuthedRdApi(accessToken: String): RealDebridApi {
-        return Retrofit.Builder()
+    // Shared authed client; refreshes the token at request time when close to expiry.
+    val authedRdApi: RealDebridApi by lazy {
+        Retrofit.Builder()
             .baseUrl("https://api.real-debrid.com/rest/1.0/")
             .client(
                 baseOkHttp.newBuilder()
+                    // Own dispatcher: keeps the refresh call (base client) out of this client's queue.
+                    .dispatcher(okhttp3.Dispatcher())
                     .addInterceptor { chain ->
+                        val accessToken = fetchTokenForRequest { getValidRdAccessToken() }
                         chain.proceed(
                             chain.request().newBuilder()
                                 .header("Authorization", "Bearer $accessToken")
@@ -156,32 +172,67 @@ class FenLightApp : Application() {
             .create(RealDebridApi::class.java)
     }
 
-    suspend fun getValidTraktAccessToken(): String = traktRefreshMutex.withLock {
-        val expiresAt = prefs.traktExpiresAt.first()
-        val accessToken = prefs.traktAccessToken.first()
-        if (System.currentTimeMillis() < expiresAt - 5 * 60 * 1000L) return@withLock accessToken
-        val refreshToken = prefs.traktRefreshToken.first()
-        val newToken = traktApi.refreshToken(mapOf(
-            "refresh_token" to refreshToken,
-            "client_id" to traktClientId,
-            "client_secret" to traktClientSecret,
-            "grant_type" to "refresh_token",
-        ))
-        prefs.saveTraktTokens(newToken.accessToken, newToken.refreshToken, newToken.expiresIn)
-        newToken.accessToken
+    // Interceptors run on OkHttp threads; surface refresh failures as IOException so
+    // OkHttp delivers them to the caller instead of crashing the dispatcher thread.
+    private fun fetchTokenForRequest(fetch: suspend () -> String): String = try {
+        runBlocking { fetch() }
+    } catch (e: IOException) {
+        throw e
+    } catch (e: Exception) {
+        throw IOException("Token refresh failed: ${e.message}", e)
     }
 
-    suspend fun getValidRdAccessToken(): String = rdRefreshMutex.withLock {
-        val expiresAt = prefs.rdExpiresAt.first()
-        val accessToken = prefs.rdAccessToken.first()
-        if (System.currentTimeMillis() < expiresAt - 5 * 60 * 1000L) return@withLock accessToken
-        val clientId = prefs.rdClientId.first()
-        val clientSecret = prefs.rdClientSecret.first()
-        val refreshToken = prefs.rdRefreshToken.first()
-        val newToken = rdBaseApi.refreshToken(clientId, clientSecret, refreshToken)
-        prefs.saveRdTokens(newToken.accessToken, newToken.refreshToken, clientId, clientSecret, newToken.expiresIn)
-        newToken.accessToken
+    private val traktRefresher by lazy {
+        TokenRefresher(
+            readTokens = {
+                StoredTokens(
+                    accessToken = prefs.traktAccessToken.first(),
+                    refreshToken = prefs.traktRefreshToken.first(),
+                    expiresAtMs = prefs.traktExpiresAt.first(),
+                )
+            },
+            refresh = { refreshToken ->
+                val token = traktApi.refreshToken(mapOf(
+                    "refresh_token" to refreshToken,
+                    "client_id" to traktClientId,
+                    "client_secret" to traktClientSecret,
+                    "grant_type" to "refresh_token",
+                ))
+                RefreshedTokens(token.accessToken, token.refreshToken, token.expiresIn)
+            },
+            saveTokens = { prefs.saveTraktTokens(it.accessToken, it.refreshToken, it.expiresInSec) },
+        )
     }
+
+    private val rdRefresher by lazy {
+        TokenRefresher(
+            readTokens = {
+                StoredTokens(
+                    accessToken = prefs.rdAccessToken.first(),
+                    refreshToken = prefs.rdRefreshToken.first(),
+                    expiresAtMs = prefs.rdExpiresAt.first(),
+                )
+            },
+            refresh = { refreshToken ->
+                val token = rdBaseApi.refreshToken(
+                    prefs.rdClientId.first(),
+                    prefs.rdClientSecret.first(),
+                    refreshToken,
+                )
+                RefreshedTokens(token.accessToken, token.refreshToken, token.expiresIn)
+            },
+            saveTokens = {
+                prefs.saveRdTokens(
+                    it.accessToken, it.refreshToken,
+                    prefs.rdClientId.first(), prefs.rdClientSecret.first(), it.expiresInSec,
+                )
+            },
+        )
+    }
+
+    suspend fun getValidTraktAccessToken(): String = traktRefresher.validAccessToken()
+
+    suspend fun getValidRdAccessToken(): String = rdRefresher.validAccessToken()
 
     companion object {
         const val TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/"

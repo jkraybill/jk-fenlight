@@ -16,7 +16,8 @@ import java.util.concurrent.TimeUnit
 //   "versionName": "1.0.1",
 //   "versionCode": 2,
 //   "apkUrl": "https://thejason40.github.io/apk/FenLightCompanion.apk",
-//   "releaseNotes": "Bug fixes and improvements"
+//   "releaseNotes": "Bug fixes and improvements",
+//   "sha256": "<hex sha-256 of the APK>"
 // }
 @JsonClass(generateAdapter = true)
 data class UpdateInfo(
@@ -24,6 +25,8 @@ data class UpdateInfo(
     @Json(name = "versionCode") val versionCode: Int,
     @Json(name = "apkUrl") val apkUrl: String,
     @Json(name = "releaseNotes") val releaseNotes: String = "",
+    // Optional: when present, the downloaded APK is verified against it before install
+    @Json(name = "sha256") val sha256: String? = null,
 )
 
 sealed class UpdateResult {
@@ -32,11 +35,18 @@ sealed class UpdateResult {
     data class Error(val message: String) : UpdateResult()
 }
 
-class UpdateChecker {
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .build()
+class UpdateChecker(
+    private val versionUrl: String = DEFAULT_VERSION_URL,
+    private val client: OkHttpClient = defaultClient(),
+) {
+    companion object {
+        const val DEFAULT_VERSION_URL = "https://thejason40.github.io/apk/version.json"
+
+        private fun defaultClient() = OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .build()
+    }
 
     private val moshi: Moshi = Moshi.Builder()
         .addLast(KotlinJsonAdapterFactory())
@@ -46,7 +56,7 @@ class UpdateChecker {
         try {
             val response = client.newCall(
                 Request.Builder()
-                    .url("https://thejason40.github.io/apk/version.json")
+                    .url(versionUrl)
                     .build()
             ).execute()
             if (!response.isSuccessful) return@withContext UpdateResult.Error("HTTP ${response.code}")
