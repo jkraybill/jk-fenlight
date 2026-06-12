@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -77,8 +78,20 @@ fun ListManagementSheet(
                     )
                 }
                 else -> {
-                    LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
-                        items(lists) { list ->
+                    val listState = rememberLazyListState()
+                    val shouldLoadMore by remember {
+                        derivedStateOf {
+                            state.listsContainingHasMore &&
+                                !state.listsContainingLoadingMore &&
+                                listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
+                                    .let { it != null && it >= listState.layoutInfo.totalItemsCount - 3 }
+                        }
+                    }
+                    LaunchedEffect(shouldLoadMore) {
+                        if (shouldLoadMore) vm.loadMoreListsContaining()
+                    }
+                    LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 24.dp)) {
+                        items(lists, key = { it.ids.trakt ?: it.name }) { list ->
                             val isLiked = list.ids.trakt in state.likedListIds
                             ListItem(
                                 headlineContent = { Text(list.name) },
@@ -103,6 +116,14 @@ fun ListManagementSheet(
                                 }) else null,
                             )
                             HorizontalDivider()
+                        }
+                        if (state.listsContainingLoadingMore) {
+                            item("footer") {
+                                Box(
+                                    Modifier.fillMaxWidth().padding(16.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) { CircularProgressIndicator(Modifier.size(24.dp)) }
+                            }
                         }
                     }
                 }

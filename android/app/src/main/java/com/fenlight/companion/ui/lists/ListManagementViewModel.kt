@@ -21,6 +21,11 @@ data class ListManagementState(
     // "Find lists containing" — null until loaded
     val listsContaining: List<TraktList>? = null,
     val listsContainingLoading: Boolean = false,
+    val listsContainingPage: Int = 0,
+    val listsContainingHasMore: Boolean = false,
+    val listsContainingLoadingMore: Boolean = false,
+    val listsContainingTraktId: String? = null,
+    val listsContainingTraktType: String? = null,
     val likedListIds: Set<Int> = emptySet(), // Trakt list ids the user has liked
 )
 
@@ -169,8 +174,10 @@ class ListManagementViewModel(application: Application) : AndroidViewModel(appli
                     _state.update { it.copy(listsContaining = emptyList(), listsContainingLoading = false) }
                     return@launch
                 }
-                val lists = if (traktType == "movie") publicApi.movieLists(traktId.toString())
-                            else publicApi.showLists(traktId.toString())
+                val traktIdStr = traktId.toString()
+                val response = if (traktType == "movie") publicApi.movieLists(traktIdStr)
+                               else publicApi.showLists(traktIdStr)
+                val pageCount = response.headers()["X-Pagination-Page-Count"]?.toIntOrNull() ?: 1
                 // Mark lists the authenticated user already likes (skip if not logged in)
                 val likedIds = runCatching {
                     val token = app.prefs.traktAccessToken.first()
@@ -179,14 +186,44 @@ class ListManagementViewModel(application: Application) : AndroidViewModel(appli
                 }.getOrDefault(emptyList())
                 _state.update {
                     it.copy(
-                        listsContaining = lists.body().orEmpty(),
+                        listsContaining = response.body().orEmpty(),
                         listsContainingLoading = false,
+                        listsContainingPage = 1,
+                        listsContainingHasMore = 1 < pageCount,
+                        listsContainingTraktId = traktIdStr,
+                        listsContainingTraktType = traktType,
                         likedListIds = likedIds.toSet(),
                     )
                 }
             } catch (e: Exception) {
                 _state.update { it.copy(listsContaining = emptyList(), listsContainingLoading = false) }
                 toast("Failed to find lists: ${e.message}")
+            }
+        }
+    }
+
+    fun loadMoreListsContaining() {
+        val s = _state.value
+        if (s.listsContainingLoadingMore || !s.listsContainingHasMore) return
+        val traktId = s.listsContainingTraktId ?: return
+        val traktType = s.listsContainingTraktType ?: return
+        val nextPage = s.listsContainingPage + 1
+        viewModelScope.launch {
+            _state.update { it.copy(listsContainingLoadingMore = true) }
+            try {
+                val response = if (traktType == "movie") app.traktApi.movieLists(traktId, page = nextPage)
+                               else app.traktApi.showLists(traktId, page = nextPage)
+                val pageCount = response.headers()["X-Pagination-Page-Count"]?.toIntOrNull() ?: nextPage
+                _state.update {
+                    it.copy(
+                        listsContaining = (it.listsContaining ?: emptyList()) + response.body().orEmpty(),
+                        listsContainingPage = nextPage,
+                        listsContainingHasMore = nextPage < pageCount,
+                        listsContainingLoadingMore = false,
+                    )
+                }
+            } catch (_: Exception) {
+                _state.update { it.copy(listsContainingLoadingMore = false) }
             }
         }
     }
