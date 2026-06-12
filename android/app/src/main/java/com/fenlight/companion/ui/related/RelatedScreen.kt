@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.fenlight.companion.data.model.TraktList
 import com.fenlight.companion.ui.components.ErrorMessage
 import com.fenlight.companion.ui.components.ListManagementSheet
 import com.fenlight.companion.ui.components.PaginatedGrid
@@ -25,6 +26,7 @@ fun RelatedScreen(
     onItemClick: (Int) -> Unit,
     onShowRecommendations: (Int) -> Unit,
     onShowSimilar: (Int) -> Unit,
+    onOpenPublicList: ((TraktList) -> Unit)? = null,
     vm: RelatedViewModel = viewModel(),
 ) {
     LaunchedEffect(mediaType, mediaId, kind) { vm.init(mediaType, mediaId, kind) }
@@ -40,6 +42,7 @@ fun RelatedScreen(
             onShowRecommendations = { onShowRecommendations(item.id) },
             onShowSimilar = { onShowSimilar(item.id) },
             onDismiss = { selectedItem = null },
+            onOpenPublicList = onOpenPublicList,
         )
     }
 

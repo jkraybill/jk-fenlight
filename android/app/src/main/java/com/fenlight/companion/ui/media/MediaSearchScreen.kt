@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fenlight.companion.data.model.MediaType
+import com.fenlight.companion.data.model.TraktList
 import com.fenlight.companion.ui.components.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -21,6 +22,7 @@ fun MediaSearchScreen(
     onItemClick: (Int) -> Unit,
     onShowRecommendations: (Int) -> Unit = {},
     onShowSimilar: (Int) -> Unit = {},
+    onOpenPublicList: ((TraktList) -> Unit)? = null,
     vm: MediaSearchViewModel,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -36,6 +38,7 @@ fun MediaSearchScreen(
             onShowRecommendations = { onShowRecommendations(item.id) },
             onShowSimilar = { onShowSimilar(item.id) },
             onDismiss = { selectedItem = null },
+            onOpenPublicList = onOpenPublicList,
         )
     }
 

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.fenlight.companion.data.model.TraktList
 import com.fenlight.companion.ui.lists.ListManagementViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,6 +46,8 @@ fun ListManagementSheet(
     // When provided, the top-level menu offers Recommendations / Similar entries
     onShowRecommendations: (() -> Unit)? = null,
     onShowSimilar: (() -> Unit)? = null,
+    // When provided, tapping a list in "Find Lists Containing" opens it in the full list view
+    onOpenPublicList: ((TraktList) -> Unit)? = null,
     vm: ListManagementViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -52,61 +55,6 @@ fun ListManagementSheet(
     var showTraktListPicker by remember { mutableStateOf(false) }
     var showTmdbListPicker by remember { mutableStateOf(false) }
     var showListsContaining by remember { mutableStateOf(false) }
-    var showOpenedList by remember { mutableStateOf(false) }
-
-    if (showOpenedList) {
-        val openedList = state.openedList ?: return
-        ModalBottomSheet(onDismissRequest = { showOpenedList = false; vm.closeList() }) {
-            Text(
-                openedList.name,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-            openedList.user?.username?.takeIf { it.isNotBlank() }?.let { owner ->
-                Text(
-                    "by $owner",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp),
-                )
-            }
-            HorizontalDivider()
-            val openedListItems = state.openedListItems
-            when {
-                state.openedListLoading || openedListItems == null -> {
-                    Box(
-                        Modifier.fillMaxWidth().padding(32.dp),
-                        contentAlignment = Alignment.Center,
-                    ) { CircularProgressIndicator() }
-                }
-                openedListItems.isEmpty() -> {
-                    Text(
-                        "No items found",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(16.dp),
-                    )
-                }
-                else -> {
-                    LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
-                        items(openedListItems, key = { it.movie?.ids?.trakt ?: it.show?.ids?.trakt ?: 0 }) { item ->
-                            val itemTitle = item.movie?.title ?: item.show?.title ?: ""
-                            val year = item.movie?.year ?: item.show?.year
-                            val typeLabel = if (item.type == "movie") "Movie" else "Show"
-                            ListItem(
-                                headlineContent = { Text(itemTitle) },
-                                supportingContent = {
-                                    Text(if (year != null) "$typeLabel · $year" else typeLabel)
-                                },
-                            )
-                            HorizontalDivider()
-                        }
-                    }
-                }
-            }
-        }
-        return
-    }
 
     if (showListsContaining) {
         ModalBottomSheet(onDismissRequest = { showListsContaining = false }) {
@@ -170,8 +118,8 @@ fun ListManagementSheet(
                                     }
                                 }) else null,
                                 modifier = Modifier.clickable {
-                                    vm.openList(list)
-                                    showOpenedList = true
+                                    onOpenPublicList?.invoke(list)
+                                    if (onOpenPublicList != null) onDismiss()
                                 },
                             )
                             HorizontalDivider()

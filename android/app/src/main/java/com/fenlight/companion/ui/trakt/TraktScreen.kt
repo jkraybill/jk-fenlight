@@ -61,6 +61,7 @@ fun TraktScreen(
     onShowClick: (Int) -> Unit = {},
     onEpisodeClick: (showId: Int, season: Int, episode: Int) -> Unit = { _, _, _ -> },
     onGoToSettings: () -> Unit = {},
+    onOpenPublicList: ((TraktList) -> Unit)? = null,
     vm: TraktViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -201,6 +202,7 @@ fun TraktScreen(
                     onRefresh = vm::refresh,
                     onMovieClick = onMovieClick,
                     onShowClick = onShowClick,
+                    onOpenPublicList = onOpenPublicList,
                 )
                 return@Column
             }
@@ -605,6 +607,7 @@ private fun ListItemsScreen(
     onRefresh: () -> Unit,
     onMovieClick: (Int) -> Unit,
     onShowClick: (Int) -> Unit,
+    onOpenPublicList: ((TraktList) -> Unit)? = null,
 ) {
     var selectedItem by remember { mutableStateOf<PaginatedItem?>(null) }
 
@@ -618,6 +621,7 @@ private fun ListItemsScreen(
             currentTraktListSlug = if (isMine) listSlug else null,
             currentTraktListName = if (isMine) listName else null,
             onDismiss = { selectedItem = null },
+            onOpenPublicList = onOpenPublicList,
         )
     }
 
@@ -642,6 +646,76 @@ private fun ListItemsScreen(
                 onItemLongClick = { selectedItem = it },
                 modifier = Modifier.fillMaxSize(),
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PublicTraktListScreen(
+    slug: String,
+    user: String,
+    listName: String,
+    onBack: () -> Unit,
+    onMovieClick: (Int) -> Unit,
+    onShowClick: (Int) -> Unit,
+    onOpenPublicList: ((TraktList) -> Unit)? = null,
+    vm: PublicTraktListViewModel = viewModel(),
+) {
+    LaunchedEffect(slug) { vm.loadList(slug, user) }
+    val state by vm.state.collectAsStateWithLifecycle()
+    var selectedItem by remember { mutableStateOf<PaginatedItem?>(null) }
+
+    selectedItem?.let { item ->
+        val mediaType = state.typeMap[item.id] ?: "movie"
+        ListManagementSheet(
+            mediaId = item.id,
+            mediaType = mediaType,
+            title = item.title,
+            posterUrl = item.posterUrl,
+            onDismiss = { selectedItem = null },
+            onOpenPublicList = onOpenPublicList,
+        )
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(listName) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            state.error?.let {
+                ErrorMessage(it, onRetry = { vm.loadList(slug, user) }, modifier = Modifier.padding(16.dp))
+                return@Column
+            }
+            if (state.isLoading && state.items.isEmpty()) {
+                LoadingIndicator(modifier = Modifier.padding(32.dp))
+                return@Column
+            }
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshing,
+                onRefresh = { vm.refresh(slug, user) },
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                PaginatedGrid(
+                    items = state.items,
+                    isLoading = state.isLoadingMore,
+                    hasMore = state.hasMore,
+                    onLoadMore = vm::loadMore,
+                    onItemClick = { item ->
+                        if (state.typeMap[item.id] == "show") onShowClick(item.id) else onMovieClick(item.id)
+                    },
+                    onItemLongClick = { selectedItem = it },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
     }
 }

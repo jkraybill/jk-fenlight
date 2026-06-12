@@ -25,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fenlight.companion.R
 import com.fenlight.companion.data.model.BrowseRowConfig
 import com.fenlight.companion.data.model.MediaType
+import com.fenlight.companion.data.model.TraktList
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import com.fenlight.companion.ui.browse.BrowseAllScreen
@@ -37,6 +38,7 @@ import com.fenlight.companion.ui.person.PersonScreen
 import com.fenlight.companion.ui.realdebrid.RdScreen
 import com.fenlight.companion.ui.related.RelatedScreen
 import com.fenlight.companion.ui.tmdb.TmdbListsScreen
+import com.fenlight.companion.ui.trakt.PublicTraktListScreen
 import com.fenlight.companion.ui.trakt.TraktScreen
 import com.fenlight.companion.ui.tvshows.EpisodeDetailScreen
 import com.fenlight.companion.ui.tvshows.TvDetailScreen
@@ -159,6 +161,12 @@ fun HomeScreen(
             }
         },
     ) { padding ->
+        val onOpenPublicList: (TraktList) -> Unit = { list ->
+            val encodedName = java.net.URLEncoder.encode(list.name, "UTF-8")
+            val listUser = list.user?.pathId ?: "me"
+            navController.navigate("trakt_public_list/${list.slug}/$listUser/$encodedName")
+        }
+
         NavHost(
             navController = navController,
             startDestination = "movies",
@@ -171,6 +179,7 @@ fun HomeScreen(
                     onShowRecommendations = { id -> navController.navigate("related/movie/$id/recommendations") },
                     onShowSimilar = { id -> navController.navigate("related/movie/$id/similar") },
                     onSeeAll = { config -> navController.navigate("movie_browse_all/${config.toNavArg()}") },
+                    onOpenPublicList = onOpenPublicList,
                     vm = viewModel<MovieViewModel>(),
                 )
             }
@@ -181,6 +190,7 @@ fun HomeScreen(
                     onItemClick = { id -> navController.navigate("movie_detail/$id") },
                     onShowRecommendations = { id -> navController.navigate("related/movie/$id/recommendations") },
                     onShowSimilar = { id -> navController.navigate("related/movie/$id/similar") },
+                    onOpenPublicList = onOpenPublicList,
                     vm = viewModel<MovieSearchViewModel>(),
                 )
             }
@@ -194,6 +204,7 @@ fun HomeScreen(
                     onItemClick = { id -> navController.navigate("movie_detail/$id") },
                     onShowRecommendations = { id -> navController.navigate("related/movie/$id/recommendations") },
                     onShowSimilar = { id -> navController.navigate("related/movie/$id/similar") },
+                    onOpenPublicList = onOpenPublicList,
                 )
             }
             composable("movie_detail/{id}") { back ->
@@ -212,6 +223,7 @@ fun HomeScreen(
                     onShowRecommendations = { id -> navController.navigate("related/tv/$id/recommendations") },
                     onShowSimilar = { id -> navController.navigate("related/tv/$id/similar") },
                     onSeeAll = { config -> navController.navigate("tv_browse_all/${config.toNavArg()}") },
+                    onOpenPublicList = onOpenPublicList,
                     vm = viewModel<TvViewModel>(),
                 )
             }
@@ -222,6 +234,7 @@ fun HomeScreen(
                     onItemClick = { id -> navController.navigate("tv_detail/$id") },
                     onShowRecommendations = { id -> navController.navigate("related/tv/$id/recommendations") },
                     onShowSimilar = { id -> navController.navigate("related/tv/$id/similar") },
+                    onOpenPublicList = onOpenPublicList,
                     vm = viewModel<TvSearchViewModel>(),
                 )
             }
@@ -235,6 +248,7 @@ fun HomeScreen(
                     onItemClick = { id -> navController.navigate("tv_detail/$id") },
                     onShowRecommendations = { id -> navController.navigate("related/tv/$id/recommendations") },
                     onShowSimilar = { id -> navController.navigate("related/tv/$id/similar") },
+                    onOpenPublicList = onOpenPublicList,
                 )
             }
             composable("tv_detail/{id}") { back ->
@@ -264,6 +278,7 @@ fun HomeScreen(
                     onMovieClick = { id -> navController.navigate("movie_detail/$id") },
                     onShowClick = { id -> navController.navigate("tv_detail/$id") },
                     onGoToSettings = onGoToSettings,
+                    onOpenPublicList = onOpenPublicList,
                 )
             }
             composable("related/{mediaType}/{id}/{kind}") { back ->
@@ -280,6 +295,7 @@ fun HomeScreen(
                     },
                     onShowRecommendations = { itemId -> navController.navigate("related/$mediaType/$itemId/recommendations") },
                     onShowSimilar = { itemId -> navController.navigate("related/$mediaType/$itemId/similar") },
+                    onOpenPublicList = onOpenPublicList,
                 )
             }
             composable("person/{id}") { back ->
@@ -300,6 +316,23 @@ fun HomeScreen(
                         navController.navigate("episode_detail/$showId/$season/$episode")
                     },
                     onGoToSettings = onGoToSettings,
+                    onOpenPublicList = onOpenPublicList,
+                )
+            }
+            composable("trakt_public_list/{slug}/{user}/{name}") { back ->
+                val slug = back.arguments?.getString("slug") ?: return@composable
+                val user = back.arguments?.getString("user") ?: return@composable
+                val name = java.net.URLDecoder.decode(
+                    back.arguments?.getString("name") ?: "", "UTF-8"
+                )
+                PublicTraktListScreen(
+                    slug = slug,
+                    user = user,
+                    listName = name,
+                    onBack = { navController.popBackStack() },
+                    onMovieClick = { id -> navController.navigate("movie_detail/$id") },
+                    onShowClick = { id -> navController.navigate("tv_detail/$id") },
+                    onOpenPublicList = onOpenPublicList,
                 )
             }
             composable("rd") { RdScreen(onGoToSettings = onGoToSettings) }
