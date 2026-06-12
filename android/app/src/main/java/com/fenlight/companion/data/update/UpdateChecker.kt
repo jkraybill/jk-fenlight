@@ -21,9 +21,9 @@ import java.util.concurrent.TimeUnit
 // }
 @JsonClass(generateAdapter = true)
 data class UpdateInfo(
-    @Json(name = "versionName") val versionName: String,
-    @Json(name = "versionCode") val versionCode: Int,
-    @Json(name = "apkUrl") val apkUrl: String,
+    @Json(name = "versionName") val versionName: String = "",
+    @Json(name = "versionCode") val versionCode: Int = 0,
+    @Json(name = "apkUrl") val apkUrl: String = "",
     @Json(name = "releaseNotes") val releaseNotes: String = "",
     // Optional: when present, the downloaded APK is verified against it before install
     @Json(name = "sha256") val sha256: String? = null,
@@ -64,6 +64,8 @@ class UpdateChecker(
                 ?: return@withContext UpdateResult.Error("Empty response")
             val info = moshi.adapter(UpdateInfo::class.java).fromJson(body)
                 ?: return@withContext UpdateResult.Error("Invalid response format")
+            if (info.versionCode == 0 || info.versionName.isBlank() || info.apkUrl.isBlank())
+                return@withContext UpdateResult.Error("Incomplete update manifest")
             if (info.versionCode > currentVersionCode) UpdateResult.Available(info)
             else UpdateResult.UpToDate
         } catch (e: Exception) {
