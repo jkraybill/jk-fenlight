@@ -12,8 +12,11 @@ menu_settings = '\
 \n                    <item id="40">\
 \n                        <property name="setting_label">Single Episode Lists</property>\
 \n                    </item>\
+\n                    <item id="55">\
+\n                        <property name="setting_label">JK</property>\
+\n                    </item>\
 \n                    <item id="50">\
-\n                        <property name="setting_label">Accounts</property>\
+\n                        <property name="setting_label">All Accounts</property>\
 \n                    </item>\
 \n                    <item id="60">\
 \n                        <property name="setting_label">Results</property>\
@@ -641,6 +644,162 @@ content_settings = '\
 \n                        <property name="setting_value">$INFO[Window(10000).Property(fenlight.trakt.calendar_future_days)]</property>\
 \n                        <property name="setting_description">Choose how many future days will be shown within the Trakt Calendar</property>\
 \n                        <onclick>RunPlugin(plugin://plugin.video.fenlight/?mode=settings_manager.set_numeric&amp;setting_id=trakt.calendar_future_days)</onclick>\
+\n                    </item>\
+\n        <!-- JK 55 - Simplified accounts for JK (RD, Premiumize, TorBox, Trakt, TMDB) -->\
+\n            <!-- Real Debrid -->\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <property name="setting_label">Real Debrid</property>\
+\n                        <property name="setting_type">separator</property>\
+\n                        <onclick>noop</onclick>\
+\n                    </item>\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <visible>String.IsEqual(Window(10000).Property(fenlight.rd.token),empty_setting)</visible>\
+\n                        <property name="setting_label">Authorize</property>\
+\n                        <property name="setting_type">action</property>\
+\n                        <property name="setting_value">...</property>\
+\n                        <property name="setting_description">Authorize your Real Debrid account</property>\
+\n                        <onclick>RunPlugin(plugin://plugin.video.fenlight/?mode=real_debrid.authenticate)</onclick>\
+\n                    </item>\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <visible>!String.IsEqual(Window(10000).Property(fenlight.rd.token),empty_setting)</visible>\
+\n                        <property name="setting_label">Enable</property>\
+\n                        <property name="setting_type">boolean</property>\
+\n                        <property name="setting_value">$INFO[Window(10000).Property(fenlight.rd.enabled)]</property>\
+\n                        <property name="setting_description">Enable the use of your Real Debrid account</property>\
+\n                        <onclick>RunPlugin(plugin://plugin.video.fenlight/?mode=settings_manager.set_boolean&amp;setting_id=rd.enabled)</onclick>\
+\n                    </item>\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <visible>!String.IsEqual(Window(10000).Property(fenlight.rd.token),empty_setting)</visible>\
+\n                        <visible>String.IsEqual(Window(10000).Property(fenlight.rd.enabled),true)</visible>\
+\n                        <property name="setting_label">Revoke Authorization</property>\
+\n                        <property name="setting_type">action</property>\
+\n                        <property name="setting_value">$INFO[Window(10000).Property(fenlight.rd.account_id)]</property>\
+\n                        <property name="setting_description">Revoke authorization of your Real Debrid account</property>\
+\n                        <onclick>RunPlugin(plugin://plugin.video.fenlight/?mode=real_debrid.revoke_authentication)</onclick>\
+\n                    </item>\
+\n            <!-- Premiumize -->\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <property name="setting_label">Premiumize</property>\
+\n                        <property name="setting_type">separator</property>\
+\n                        <onclick>noop</onclick>\
+\n                    </item>\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <visible>String.IsEqual(Window(10000).Property(fenlight.pm.token),empty_setting)</visible>\
+\n                        <property name="setting_label">Authorize</property>\
+\n                        <property name="setting_type">action</property>\
+\n                        <property name="setting_value">...</property>\
+\n                        <property name="setting_description">Authorize your Premiumize account</property>\
+\n                        <onclick>RunPlugin(plugin://plugin.video.fenlight/?mode=premiumize.authenticate)</onclick>\
+\n                    </item>\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <visible>!String.IsEqual(Window(10000).Property(fenlight.pm.token),empty_setting)</visible>\
+\n                        <property name="setting_label">Enable</property>\
+\n                        <property name="setting_type">boolean</property>\
+\n                        <property name="setting_value">$INFO[Window(10000).Property(fenlight.pm.enabled)]</property>\
+\n                        <property name="setting_description">Enable the use of your Premiumize account</property>\
+\n                        <onclick>RunPlugin(plugin://plugin.video.fenlight/?mode=settings_manager.set_boolean&amp;setting_id=pm.enabled)</onclick>\
+\n                    </item>\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <visible>!String.IsEqual(Window(10000).Property(fenlight.pm.token),empty_setting)</visible>\
+\n                        <visible>String.IsEqual(Window(10000).Property(fenlight.pm.enabled),true)</visible>\
+\n                        <property name="setting_label">Revoke Authorization</property>\
+\n                        <property name="setting_type">action</property>\
+\n                        <property name="setting_value">$INFO[Window(10000).Property(fenlight.pm.account_id)]</property>\
+\n                        <property name="setting_description">Revoke authorization of your Premiumize account</property>\
+\n                        <onclick>RunPlugin(plugin://plugin.video.fenlight/?mode=premiumize.revoke_authentication)</onclick>\
+\n                    </item>\
+\n            <!-- TorBox -->\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <property name="setting_label">TorBox</property>\
+\n                        <property name="setting_type">separator</property>\
+\n                        <onclick>noop</onclick>\
+\n                    </item>\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <visible>String.IsEqual(Window(10000).Property(fenlight.tb.token),empty_setting)</visible>\
+\n                        <property name="setting_label">Authorize</property>\
+\n                        <property name="setting_type">action</property>\
+\n                        <property name="setting_value">...</property>\
+\n                        <property name="setting_description">Authorize your TorBox account</property>\
+\n                        <onclick>RunPlugin(plugin://plugin.video.fenlight/?mode=torbox.authenticate)</onclick>\
+\n                    </item>\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <visible>!String.IsEqual(Window(10000).Property(fenlight.tb.token),empty_setting)</visible>\
+\n                        <property name="setting_label">Enable</property>\
+\n                        <property name="setting_type">boolean</property>\
+\n                        <property name="setting_value">$INFO[Window(10000).Property(fenlight.tb.enabled)]</property>\
+\n                        <property name="setting_description">Enable the use of your TorBox account</property>\
+\n                        <onclick>RunPlugin(plugin://plugin.video.fenlight/?mode=settings_manager.set_boolean&amp;setting_id=tb.enabled)</onclick>\
+\n                    </item>\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <visible>!String.IsEqual(Window(10000).Property(fenlight.tb.token),empty_setting)</visible>\
+\n                        <visible>String.IsEqual(Window(10000).Property(fenlight.tb.enabled),true)</visible>\
+\n                        <property name="setting_label">Revoke Authorization</property>\
+\n                        <property name="setting_type">action</property>\
+\n                        <property name="setting_value">$INFO[Window(10000).Property(fenlight.tb.account_id)]</property>\
+\n                        <property name="setting_description">Revoke authorization of your TorBox account</property>\
+\n                        <onclick>RunPlugin(plugin://plugin.video.fenlight/?mode=torbox.revoke_authentication)</onclick>\
+\n                    </item>\
+\n            <!-- Trakt -->\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <property name="setting_label">Trakt</property>\
+\n                        <property name="setting_type">separator</property>\
+\n                        <onclick>noop</onclick>\
+\n                    </item>\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <visible>String.IsEqual(Window(10000).Property(fenlight.trakt.user),empty_setting)</visible>\
+\n                        <property name="setting_label">Authorize</property>\
+\n                        <property name="setting_type">action</property>\
+\n                        <property name="setting_value">...</property>\
+\n                        <property name="setting_description">Authorize your Trakt account</property>\
+\n                        <onclick>RunPlugin(plugin://plugin.video.fenlight/?mode=trakt.trakt_authenticate)</onclick>\
+\n                    </item>\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <visible>!String.IsEqual(Window(10000).Property(fenlight.trakt.user),empty_setting)</visible>\
+\n                        <property name="setting_label">Revoke Authorization</property>\
+\n                        <property name="setting_type">action</property>\
+\n                        <property name="setting_value">$INFO[Window(10000).Property(fenlight.trakt.user)]</property>\
+\n                        <property name="setting_description">Revoke authorization of your Trakt account</property>\
+\n                        <onclick>RunPlugin(plugin://plugin.video.fenlight/?mode=trakt.trakt_revoke_authentication)</onclick>\
+\n                    </item>\
+\n            <!-- TMDB -->\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <property name="setting_label">TMDB</property>\
+\n                        <property name="setting_type">separator</property>\
+\n                        <onclick>noop</onclick>\
+\n                    </item>\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <visible>String.IsEqual(Window(10000).Property(fenlight.tmdb.access_token),empty_setting)</visible>\
+\n                        <property name="setting_label">Authorize</property>\
+\n                        <property name="setting_type">action</property>\
+\n                        <property name="setting_value">...</property>\
+\n                        <property name="setting_description">Authorize your TMDB account</property>\
+\n                        <onclick>RunPlugin(plugin://plugin.video.fenlight/?mode=tmdb.authenticate)</onclick>\
+\n                    </item>\
+\n                    <item>\
+\n                        <visible>Container(2000).HasFocus(55)</visible>\
+\n                        <visible>!String.IsEqual(Window(10000).Property(fenlight.tmdb.access_token),empty_setting)</visible>\
+\n                        <property name="setting_label">Revoke Authorization</property>\
+\n                        <property name="setting_type">action</property>\
+\n                        <property name="setting_value">...</property>\
+\n                        <property name="setting_description">Revoke authorization of your TMDB account</property>\
+\n                        <onclick>RunPlugin(plugin://plugin.video.fenlight/?mode=tmdb.deauth)</onclick>\
 \n                    </item>\
 \n        <!-- ACCOUNTS 50 -->\
 \n            <!-- Trakt -->\
