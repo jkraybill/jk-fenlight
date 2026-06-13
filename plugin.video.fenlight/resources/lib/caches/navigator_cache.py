@@ -17,23 +17,40 @@ anime_random_converts = {'navigator.genres': 'tmdb_anime_genres', 'navigator.pro
 'navigator.decades': 'tmdb_anime_decade', 'navigator.certifications': 'trakt_anime_certifications'}
 
 root_list = [
-{'name': 'Movies', 'mode': 'navigator.main', 'action': 'MovieList', 'iconImage': 'movies'},
-{'name': 'TV Shows', 'mode': 'navigator.main', 'action': 'TVShowList', 'iconImage': 'tv'},
+{'name': 'Movies', 'mode': 'navigator.main', 'action': 'JKMovieList', 'iconImage': 'movies'},
+{'name': 'TV Shows', 'mode': 'navigator.main', 'action': 'JKTVShowList', 'iconImage': 'tv'},
 {'name': 'Trakt My Lists', 'mode': 'trakt.list.get_trakt_lists', 'list_type': 'my_lists', 'category_name': 'My Lists', 'iconImage': 'trakt'},
 {'name': 'Search', 'mode': 'navigator.search', 'iconImage': 'search'},
-{'name': 'Discover', 'mode': 'navigator.discover', 'iconImage': 'discover'},
-{'name': 'My Services', 'mode': 'navigator.premium', 'iconImage': 'premium'},
 {'name': 'Attic', 'mode': 'navigator.attic', 'iconImage': 'folder'},
 {'name': 'Tools', 'mode': 'navigator.tools', 'iconImage': 'settings2'}
 			]
 
+jk_movie_list = [
+{'name': 'Trending Recent', 'mode': 'build_movie_list', 'action': 'trakt_movies_trending_recent', 'iconImage': 'trending_recent'},
+{'name': 'Most Favorited', 'mode': 'build_movie_list', 'action': 'trakt_movies_most_favorited', 'random_support': 'true', 'iconImage': 'favorites'},
+{'name': 'Oscar Winners', 'mode': 'build_movie_list', 'action': 'tmdb_movies_oscar_winners', 'random_support': 'true', 'iconImage': 'oscar_winners'},
+{'name': 'Genres', 'mode': 'navigator.genres', 'menu_type': 'movie', 'random_support': 'true', 'iconImage': 'genres'},
+{'name': 'Decades', 'mode': 'navigator.decades', 'menu_type': 'movie', 'random_support': 'true', 'iconImage': 'calendar_decades'}
+			]
+
+jk_tvshow_list = [
+{'name': 'Trending Recent', 'mode': 'build_tvshow_list', 'action': 'trakt_tv_trending_recent', 'random_support': 'true', 'iconImage': 'trending_recent'},
+{'name': 'Most Favorited', 'mode': 'build_tvshow_list', 'action': 'trakt_tv_most_favorited', 'random_support': 'true', 'iconImage': 'favorites'},
+{'name': 'Genres', 'mode': 'navigator.genres', 'menu_type': 'tvshow', 'random_support': 'true', 'iconImage': 'genres'},
+{'name': 'Decades', 'mode': 'navigator.decades', 'menu_type': 'tvshow', 'random_support': 'true', 'iconImage': 'calendar_decades'}
+			]
+
 attic_list = [
+{'name': 'All Movies', 'mode': 'navigator.main', 'action': 'MovieList', 'iconImage': 'movies'},
+{'name': 'All TV Shows', 'mode': 'navigator.main', 'action': 'TVShowList', 'iconImage': 'tv'},
 {'name': 'Anime', 'mode': 'navigator.main', 'action': 'AnimeList', 'iconImage': 'anime'},
 {'name': 'People', 'mode': 'navigator.people', 'iconImage': 'genre_family'},
 {'name': 'Random Lists', 'mode': 'navigator.random_lists', 'iconImage': 'random'},
 {'name': 'Favorites', 'mode': 'navigator.favorites', 'iconImage': 'favorites'},
 {'name': 'Downloads', 'mode': 'navigator.downloads', 'iconImage': 'downloads'},
-{'name': 'My Lists', 'mode': 'navigator.my_content', 'iconImage': 'lists'}
+{'name': 'My Lists', 'mode': 'navigator.my_content', 'iconImage': 'lists'},
+{'name': 'My Services', 'mode': 'navigator.premium', 'iconImage': 'premium'},
+{'name': 'Discover', 'mode': 'navigator.discover', 'iconImage': 'discover'}
 			]
 
 movie_list = [
@@ -111,7 +128,7 @@ anime_list = [
 {'name': 'Anime Certifications', 'mode': 'navigator.certifications', 'menu_type': 'anime', 'random_support': 'true', 'iconImage': 'certifications'},
 				]
 
-main_menus = {'RootList': root_list, 'MovieList': movie_list, 'TVShowList': tvshow_list, 'AnimeList': anime_list}
+main_menus = {'RootList': root_list, 'MovieList': movie_list, 'TVShowList': tvshow_list, 'AnimeList': anime_list, 'JKMovieList': jk_movie_list, 'JKTVShowList': jk_tvshow_list}
 
 class NavigatorCache:
 	def get_main_lists(self, list_name):
