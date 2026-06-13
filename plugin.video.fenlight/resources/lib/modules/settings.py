@@ -17,7 +17,16 @@ sort_to_top_dict = {'folders': 'fenlight.results.sort_folders_first', 'rd_cloud'
 internal_scrapers_clouds_list = [('rd', 'provider.rd_cloud'), ('pm', 'provider.pm_cloud'), ('ad', 'provider.ad_cloud'), ('oc', 'provider.oc_cloud'), ('tb', 'provider.tb_cloud')]
 
 def tmdb_api_key():
-	return get_setting('fenlight.tmdb_api', '')
+	setting = get_setting('fenlight.tmdb_api', '')
+	if setting not in ('', 'empty_setting'):
+		return setting
+	try:
+		from modules.secrets import TMDB_API_KEY
+		return TMDB_API_KEY
+	except ImportError:
+		from modules.kodi_utils import notification
+		notification('TMDB Error: secrets.py missing - tell Gordo!', time=5000)
+		return ''
 	
 def tmdb_user_active():
 	return get_setting('fenlight.tmdb.access_token', 'empty_setting') not in ('empty_setting', '')
