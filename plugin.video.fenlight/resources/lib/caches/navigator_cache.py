@@ -19,7 +19,8 @@ anime_random_converts = {'navigator.genres': 'tmdb_anime_genres', 'navigator.pro
 root_list = [
 {'name': 'Movies', 'mode': 'navigator.main', 'action': 'JKMovieList', 'iconImage': 'movies'},
 {'name': 'TV Shows', 'mode': 'navigator.main', 'action': 'JKTVShowList', 'iconImage': 'tv'},
-{'name': 'Trakt My Lists', 'mode': 'trakt.list.get_trakt_lists', 'list_type': 'my_lists', 'category_name': 'My Lists', 'iconImage': 'trakt'},
+{'name': 'TV Currently Watching', 'mode': 'trakt.list.build_trakt_list', 'user': 'simiansays', 'slug': 'tv-currently-watching-couchmoney-tv-0c008c1b-5149-4663-b049-794a25a8bb54', 'list_type': 'my_lists', 'list_name': 'TV Currently Watching', 'iconImage': 'in_progress_tvshow'},
+{'name': 'Lists', 'mode': 'trakt.list.get_trakt_lists', 'list_type': 'my_lists', 'category_name': 'My Lists', 'iconImage': 'trakt'},
 {'name': 'Search', 'mode': 'navigator.search', 'iconImage': 'search'},
 {'name': 'Attic', 'mode': 'navigator.attic', 'iconImage': 'folder'},
 {'name': 'Tools', 'mode': 'navigator.tools', 'iconImage': 'settings2'}
