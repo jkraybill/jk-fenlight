@@ -23,10 +23,26 @@ def tmdb_user_active():
 	return get_setting('fenlight.tmdb.access_token', 'empty_setting') not in ('empty_setting', '')
 
 def trakt_client():
-	return get_setting('fenlight.trakt.client', '')
+	setting = get_setting('fenlight.trakt.client', '')
+	if setting not in ('', 'empty_setting'):
+		return setting
+	try:
+		from modules.secrets import TRAKT_CLIENT_ID
+		return TRAKT_CLIENT_ID
+	except ImportError:
+		from modules.kodi_utils import notification
+		notification('Trakt Error: secrets.py missing - tell Gordo!', time=5000)
+		return ''
 
 def trakt_secret():
-	return get_setting('fenlight.trakt.secret', '')
+	setting = get_setting('fenlight.trakt.secret', '')
+	if setting not in ('', 'empty_setting'):
+		return setting
+	try:
+		from modules.secrets import TRAKT_CLIENT_SECRET
+		return TRAKT_CLIENT_SECRET
+	except ImportError:
+		return ''
 
 def trakt_user_active():
 	return get_setting('fenlight.trakt.user', 'empty_setting') not in ('empty_setting', '')
