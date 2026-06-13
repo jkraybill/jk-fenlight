@@ -70,6 +70,12 @@ class Navigator:
 		if easynews_authorized(): self.add({'mode': 'navigator.easynews'}, 'Easynews', 'easynews')
 		self.end_directory()
 
+	def attic(self):
+		from caches.navigator_cache import attic_list
+		for item in attic_list:
+			self.add(item, item['name'], item.get('iconImage', 'folder'))
+		self.end_directory()
+
 	def easynews(self):
 		self.add({'mode': 'navigator.search_history', 'action': 'easynews_video'}, 'Search Videos', 'search')
 		self.add({'mode': 'navigator.search_history', 'action': 'easynews_image'}, 'Search Images', 'search')

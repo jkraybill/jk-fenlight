@@ -19,16 +19,20 @@ anime_random_converts = {'navigator.genres': 'tmdb_anime_genres', 'navigator.pro
 root_list = [
 {'name': 'Movies', 'mode': 'navigator.main', 'action': 'MovieList', 'iconImage': 'movies'},
 {'name': 'TV Shows', 'mode': 'navigator.main', 'action': 'TVShowList', 'iconImage': 'tv'},
-{'name': 'Anime', 'mode': 'navigator.main', 'action': 'AnimeList', 'iconImage': 'anime'},
-{'name': 'People', 'mode': 'navigator.people', 'iconImage': 'genre_family'},
 {'name': 'Search', 'mode': 'navigator.search', 'iconImage': 'search'},
 {'name': 'Discover', 'mode': 'navigator.discover', 'iconImage': 'discover'},
-{'name': 'Random Lists', 'mode': 'navigator.random_lists', 'iconImage': 'random'},
 {'name': 'My Lists', 'mode': 'navigator.my_content', 'iconImage': 'lists'},
 {'name': 'My Services', 'mode': 'navigator.premium', 'iconImage': 'premium'},
-{'name': 'Favorites', 'mode': 'navigator.favorites', 'iconImage': 'favorites'},
-{'name': 'Downloads', 'mode': 'navigator.downloads', 'iconImage': 'downloads'},
+{'name': 'Attic', 'mode': 'navigator.attic', 'iconImage': 'folder'},
 {'name': 'Tools', 'mode': 'navigator.tools', 'iconImage': 'settings2'}
+			]
+
+attic_list = [
+{'name': 'Anime', 'mode': 'navigator.main', 'action': 'AnimeList', 'iconImage': 'anime'},
+{'name': 'People', 'mode': 'navigator.people', 'iconImage': 'genre_family'},
+{'name': 'Random Lists', 'mode': 'navigator.random_lists', 'iconImage': 'random'},
+{'name': 'Favorites', 'mode': 'navigator.favorites', 'iconImage': 'favorites'},
+{'name': 'Downloads', 'mode': 'navigator.downloads', 'iconImage': 'downloads'}
 			]
 
 movie_list = [
