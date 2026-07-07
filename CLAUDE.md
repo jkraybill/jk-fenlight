@@ -47,6 +47,12 @@ See `~/jk-gordo-workshop` memory for SHYSKY ADB reference.
 
 ---
 
+## Known Upstream API Notes
+
+- **Trakt API (2026 overhaul):** watched/collection endpoints now force pagination at 100/page, and show/season progress requires `extended=progress`. Root-caused S97 workshop; on-device patches live on SHYSKY (see workshop memory: fenlight debug pattern). Any repo-side Trakt work must respect both.
+
+---
+
 ## Constitutional Grounding
 
 This project operates under the **jk-gordo-workshop** hub and the Project Gordo umbrella.
@@ -68,3 +74,5 @@ This project operates under the **jk-gordo-workshop** hub and the Project Gordo 
 - **Root:** project-gordo (T0)
 - **Onboarded:** 2026-06-13
 - **Searchable tag:** project-gordo-umbrella
+
+<!-- Last reviewed: 2026-07-08 02:39 AEST by Gordo -->
