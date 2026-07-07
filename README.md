@@ -1,3 +1,5 @@
+> **This fork (jk-fenlight):** JK's deployment copy for the SHYSKY Kodi box — currently at 2.2.12 with local fixes (S97: Trakt next-episodes via `extended=progress` + pagination). The README below is inherited from thejason40's FenLight+; its install instructions and version numbers describe *his* repo, not this fork.
+
 I'm jokingly called this FenLight+. There was always 1 thing I wished Fen could do that it couldn't and that was delete RD Cloud files from the results screen so that I didn't have to go into My Services everytime I accidently added a bad package to the cloud. Now it can. 
 
 Since then I've also added more features, such as:
