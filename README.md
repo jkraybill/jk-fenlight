@@ -1,4 +1,8 @@
-> **This fork (jk-fenlight):** JK's deployment copy for the SHYSKY Kodi box — currently at 2.2.12 with local fixes (S97: Trakt next-episodes via `extended=progress` + pagination). The README below is inherited from thejason40's FenLight+; its install instructions and version numbers describe *his* repo, not this fork.
+> **This fork (jk-fenlight):** JK's deployment copy, at **2.2.99**. The version is deliberately parked at the top of the 2.2.x range so a stray upstream 2.2.x cannot sort above it and overwrite the local fixes.
+>
+> Local fixes: the Trakt watched endpoints are paginated and TV asks for `extended=progress` (S155). Before that fix the addon collected 0 episodes and the first 100 movies of any account, and *wrote* the empty episode list — `set_bulk_tvshow_watched` deletes the whole `db_type` before inserting, so it emptied the indicator table rather than just failing to fill it. Root-caused S97 against the live API, fixed in-repo S155; `tests/test_trakt_indicators.py` holds the RED/GREEN control.
+>
+> The README below is inherited from thejason40's FenLight+; its install instructions and version numbers describe *his* repo, not this fork. In particular, do not point "Manage Addon Updates" at the upstream repo — an update from it overwrites these fixes.
 
 I'm jokingly called this FenLight+. There was always 1 thing I wished Fen could do that it couldn't and that was delete RD Cloud files from the results screen so that I didn't have to go into My Services everytime I accidently added a bad package to the cloud. Now it can. 
 

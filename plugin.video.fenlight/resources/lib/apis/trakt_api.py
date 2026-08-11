@@ -649,6 +649,34 @@ def get_trakt_tvshow_id(item):
 			except: tmdb_id = None
 	return tmdb_id
 
+def get_watched_pages(path, extended=None):
+	# Trakt hard-paginates the watched endpoints at 100 items per page and ignores
+	# a larger limit (trakt/trakt-api discussion #775). A single unpaginated call
+	# returns the first 100 rows and looks exactly like a complete answer, which is
+	# how a 1144-show account came back with 100 shows and nobody saw an error. The
+	# page count in the response headers is the only thing that says how much is
+	# really there.
+	#
+	# Returns the full list of items, or None if ANY page failed. Do not soften that
+	# to "return what we got": set_bulk_*_watched deletes the whole db_type before
+	# inserting, so committing a partial pull wipes every row we did not fetch.
+	items, page_no, page_count = [], 1, 1
+	while page_no <= page_count:
+		params = {'limit': 100}
+		if extended: params['extended'] = extended
+		try:
+			response = call_trakt(path, params=params, with_auth=True, pagination=True, page_no=page_no)
+			result, page_count = response[0], int(response[1])
+		except Exception as e:
+			logger('Trakt Error', 'watched pagination failed: %s page %s of %s: %s' % (path, page_no, page_count, str(e)))
+			return None
+		if result is None:
+			logger('Trakt Error', 'watched pagination got no result: %s page %s of %s' % (path, page_no, page_count))
+			return None
+		items += result
+		page_no += 1
+	return items
+
 def trakt_indicators_movies():
 	def _process(item):
 		movie = item['movie']
@@ -657,34 +685,38 @@ def trakt_indicators_movies():
 		insert_append(('movie', tmdb_id, '', '', item['last_watched_at'], movie['title']))
 	insert_list = []
 	insert_append = insert_list.append
-	params = {'path': 'sync/watched/movies%s', 'with_auth': True, 'pagination': False}
-	result = get_trakt(params)
+	result = get_watched_pages('sync/watched/movies')
+	if result is None: return
 	threads = list(make_thread_list(_process, result))
 	[i.join() for i in threads]
-	trakt_watched_cache.set_bulk_movie_watched(insert_list)
+	if insert_list: trakt_watched_cache.set_bulk_movie_watched(insert_list)
 
 def trakt_indicators_tv():
 	def _process(item):
 		reset_at = item.get('reset_at', None)
 		if reset_at: reset_at = js2date(reset_at, res_format)
 		show = item['show']
-		seasons = item['seasons']
+		# extended=progress, not extended=full: Trakt stopped returning the seasons
+		# array by default, and full does not bring it back. Without it every show
+		# here has no episodes and the indicator table ends up empty.
+		seasons = item.get('seasons', [])
 		title = show['title']
 		tmdb_id = get_trakt_tvshow_id(show['ids'])
 		if not tmdb_id: return
 		for s in seasons:
-			season_no, episodes = s['number'], s['episodes']
+			season_no, episodes = s['number'], s.get('episodes', [])
 			for e in episodes:
-				last_watched_at = e['last_watched_at']
+				last_watched_at = e.get('last_watched_at')
+				if not last_watched_at: continue
 				if reset_at and reset_at > js2date(last_watched_at, res_format): continue
 				insert_append(('episode', tmdb_id, season_no, e['number'], last_watched_at, title))
 	insert_list = []
 	insert_append = insert_list.append
-	params = {'path': 'users/me/watched/shows?extended=full%s', 'with_auth': True, 'pagination': False}
-	result = get_trakt(params)
+	result = get_watched_pages('users/me/watched/shows', extended='progress')
+	if result is None: return
 	threads = list(make_thread_list(_process, result))
 	[i.join() for i in threads]
-	trakt_watched_cache.set_bulk_tvshow_watched(insert_list)
+	if insert_list: trakt_watched_cache.set_bulk_tvshow_watched(insert_list)
 
 def trakt_playback_progress():
 	params = {'path': 'sync/playback%s', 'with_auth': True, 'pagination': False}
@@ -820,6 +852,21 @@ def trakt_sync_activities(force_update=False):
 		return result
 	def _check_daily_expiry():
 		return int(time.time()) >= int(get_setting('fenlight.trakt.next_daily_clear', '0'))
+	def _refill_if_empty():
+		# Every gate below compares Trakt's activity timestamps against the cached
+		# ones, so once the two agree, nothing runs. That is right unless the watched
+		# tables are empty - there is then nothing to be up to date with, and the sync
+		# declines to refill them for as long as the account stays quiet. An empty
+		# cache is its own trigger. watched_count returns -1 when unreadable, which
+		# must not count as empty or a broken db would pull from Trakt every pass.
+		refilled = False
+		if trakt_watched_cache.watched_count('episode') == 0:
+			trakt_indicators_tv()
+			refilled = True
+		if trakt_watched_cache.watched_count('movie') == 0:
+			trakt_indicators_movies()
+			refilled = True
+		return 'success' if refilled else 'not needed'
 	if force_update: clear_all_trakt_cache_data(silent=True, refresh=False)
 	elif _check_daily_expiry():
 		clear_daily_cache()
@@ -828,7 +875,7 @@ def trakt_sync_activities(force_update=False):
 	try: latest = trakt_get_activity()
 	except: return 'failed'
 	cached = reset_activity(latest)
-	if not _compare(latest['all'], cached['all']): return 'not needed'
+	if not _compare(latest['all'], cached['all']): return _refill_if_empty()
 	lists_actions, refresh_movies_progress, refresh_shows_progress, clear_tvshow_watched_cache = [], False, False, False
 	cached_movies, latest_movies = cached['movies'], latest['movies']
 	cached_shows, latest_shows = cached['shows'], latest['shows']

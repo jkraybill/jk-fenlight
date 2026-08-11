@@ -9,6 +9,7 @@ DELETE = 'DELETE FROM trakt_data WHERE id=?'
 DELETE_LIKE = 'DELETE FROM trakt_data WHERE id LIKE "%s"'
 WATCHED_INSERT = 'INSERT OR IGNORE INTO watched VALUES (?, ?, ?, ?, ?, ?)'
 WATCHED_DELETE = 'DELETE FROM watched WHERE db_type = ?'
+WATCHED_COUNT = 'SELECT count(*) FROM watched WHERE db_type = ?'
 PROGRESS_INSERT = 'INSERT OR IGNORE INTO progress VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
 PROGRESS_DELETE = 'DELETE FROM progress WHERE db_type = ?'
 STATUS_INSERT = 'INSERT INTO watched_status VALUES (?, ?, ?)'
@@ -67,6 +68,15 @@ class TraktWatched():
 	def set_bulk_tvshow_progress(self, insert_list):
 		self._delete(PROGRESS_DELETE, ('episode',))
 		self._executemany(PROGRESS_INSERT, insert_list)
+
+	def watched_count(self, db_type):
+		# Returns -1 rather than 0 when the table cannot be read. Callers use an
+		# empty cache as a trigger to resync, and "unreadable" must not look like
+		# "empty" or a broken database would force a full Trakt pull every pass.
+		try:
+			dbcon = connect_database('trakt_db')
+			return dbcon.execute(WATCHED_COUNT, (db_type,)).fetchone()[0]
+		except: return -1
 
 	def _executemany(self, command, insert_list):
 		dbcon = connect_database('trakt_db')
