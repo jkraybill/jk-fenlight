@@ -3,3 +3,6 @@ New Text Document.txt
 # Local secrets - never commit
 plugin.video.fenlight/resources/lib/modules/secrets.py
 *.zip
+
+# gordo-ledger index (local, rebuild: cli.js index)
+.gordo-memory/

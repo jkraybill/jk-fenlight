@@ -1,0 +1,14 @@
+{
+  "memory": {
+    "semantic": {
+      "enabled": true,
+      "provider": "ollama",
+      "model": "mxbai-embed-large",
+      "threshold": 0.5,
+      "indexPath": ".gordo-memory",
+      "autoIndex": true,
+      "indexDocs": true,
+      "indexCode": false
+    }
+  }
+}
