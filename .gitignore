@@ -6,3 +6,9 @@ plugin.video.fenlight/resources/lib/modules/secrets.py
 
 # gordo-ledger index (local, rebuild: cli.js index)
 .gordo-memory/
+
+# gordo-ledger issue/commit layer (regenerable: sync-issue-commit-layers.sh)
+github-issues/
+
+# gordo-ledger issue/commit layer (regenerable: sync-issue-commit-layers.sh)
+git-commits/
